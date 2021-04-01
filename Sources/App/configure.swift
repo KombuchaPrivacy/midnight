@@ -17,8 +17,11 @@ public func configure(_ app: Application) throws {
         database: Environment.get("DATABASE_NAME") ?? "vapor_database"
     ), as: .psql)
 
-    app.migrations.add(CreateTodo())
-
+    let reg = RegistrationController(app: app,
+                                     homeserver: "192.168.1.89",
+                                     homeserver_port: 6167,
+                                     apiVersions: ["r0", "v1"])
+    
     // register routes
-    try routes(app)
+    try routes(app, reg: reg)
 }

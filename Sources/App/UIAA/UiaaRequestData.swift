@@ -13,6 +13,7 @@ public struct UiaaAuthData: Content {
     // However, that's really not our problem here, as long as we can pass those along unmodified to the homeserver
     var type: String
     var session: String?
+    var token: String? //
 }
 
 public struct UiaaSessionOnly: Content {
