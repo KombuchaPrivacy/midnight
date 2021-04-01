@@ -6,19 +6,7 @@ let homeserver = "192.168.1.89"
 let homeserver_port = 6167
 
 func routes(_ app: Application) throws {
-    
-    /*
-    app.get { req in
-        return "It works!"
-    }
-
-    app.get("hello") { req -> String in
-        return "Hello, world!"
-    }
-
-    try app.register(collection: TodoController())
-    */
-    
+       
     app.post(["_matrix", "client", ":version", "register"]) { req -> EventLoopFuture<UiaaResponseData> in
         
         guard let apiVersion = req.parameters.get("version") else {

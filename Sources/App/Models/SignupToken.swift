@@ -1,5 +1,5 @@
 //
-//  File.swift
+//  SignupToken.swift
 //  
 //
 //  Created by Macro Ramius on 3/30/21.
@@ -8,7 +8,7 @@
 import Fluent
 import Vapor
 
-final class Token: Model {
+final class SignupToken: Model {
     static let schema = "membership"
     
     @ID(key: .id)
