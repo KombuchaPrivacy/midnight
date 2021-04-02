@@ -8,8 +8,36 @@
 import Fluent
 import Vapor
 
+final class PendingSubscription: Model {
+    static let schema = "pending"
+    
+    @ID(key: .id)
+    var id: UUID?
+    
+    @Field(key: "token")
+    var token: String
+    
+    @Field(key: "session_id")
+    var sessionId: String
+    
+    @Timestamp(key: "created_at", on: .create)
+    var createdAt: Date?
+    
+    @Field(key: "expires_at")
+    var expiresAt: Date
+    
+    init() {}
+    
+    init(id: UUID? = nil, token: String, session: String, expiration: Date) {
+        self.id = id
+        self.token = token
+        self.sessionId = session
+        self.expiresAt = expiration
+    }
+}
+
 final class Subscription: Model {
-    static let schema = "membership"
+    static let schema = "subscription"
     
     @ID(key: .id)
     var id: UUID?

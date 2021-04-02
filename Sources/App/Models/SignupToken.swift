@@ -8,27 +8,42 @@
 import Fluent
 import Vapor
 
+struct TokenString: Equatable {
+    let string: String
+    
+    init() {
+        self.string = String(format: "%016x", UInt64.random())
+    }
+}
+
 final class SignupToken: Model {
-    static let schema = "membership"
+    static let schema = "signuptokens"
     
     @ID(key: .id)
     var id: UUID?
     
-    @Field(key: "creation")
-    var creationDate: Date
+    @Field(key: "token")
+    var token: String
     
-    @Field(key: "expiry")
-    var expiryDate: Date
+    @Field(key: "max_signups")
+    var maxSignups: UInt
     
-    @Field(key: "user_id")
-    var userId: String
+    @Field(key: "created_by")
+    var createdBy: String
+    
+    @Timestamp(key: "created_at", on: .create)
+    var createdAt: Date?
+    
+    @Field(key: "expires_at")
+    var expiresAt: Date?
     
     init() {}
     
-    init(id: UUID? = nil, creationDate: Date, expiryDate: Date, userId: String) {
+    init(id: UUID? = nil, numUses: UInt, for userId: String, expiresAt: Date? = nil) {
         self.id = id
-        self.creationDate = creationDate
-        self.expiryDate = expiryDate
-        self.userId = userId
+        self.token = String(format: "%016x", UInt64.random())
+        self.maxSignups = numUses
+        self.createdBy = userId
+        self.expiresAt = expiresAt
     }
 }

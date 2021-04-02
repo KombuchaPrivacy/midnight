@@ -1,5 +1,6 @@
 import Fluent
-import FluentPostgresDriver
+//import FluentPostgresDriver
+import FluentSQLiteDriver
 import Vapor
 
 // configures your application
@@ -9,6 +10,7 @@ public func configure(_ app: Application) throws {
     
     app.middleware.use(app.uiaaSessions.middleware)
 
+    /*
     app.databases.use(.postgres(
         hostname: Environment.get("DATABASE_HOST") ?? "localhost",
         port: Environment.get("DATABASE_PORT").flatMap(Int.init(_:)) ?? PostgresConfiguration.ianaPortNumber,
@@ -16,6 +18,9 @@ public func configure(_ app: Application) throws {
         password: Environment.get("DATABASE_PASSWORD") ?? "vapor_password",
         database: Environment.get("DATABASE_NAME") ?? "vapor_database"
     ), as: .psql)
+    */
+    
+    app.databases.use(.sqlite(.file("db.sqlite")), as: .sqlite)
 
     let reg = RegistrationController(app: app,
                                      homeserver: "192.168.1.89",
