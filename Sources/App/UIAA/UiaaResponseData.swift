@@ -8,14 +8,14 @@
 import Fluent
 import Vapor
 
-struct MatrixAuthFlow: Content {
+struct UiaaAuthFlow: Content {
     var stages: [String]
 }
 
 struct UiaaResponseData: Content {
     var errcode: String?
     var error: String?
-    var flows: [MatrixAuthFlow]
+    var flows: [UiaaAuthFlow]
     var params: [String: [String:String]]?
     var completed: [String]?
     var session: String
