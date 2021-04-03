@@ -125,17 +125,79 @@ struct RegistrationController {
             .filter(\.$sessionId == sessionId)
             .delete()
     }
-
     
+    
+    
+    // Improved approach.  Two core functions:
+    // * handleRegisterRequest - Looks at the request and decides what to do with it
+    //   - Handle it ourselves
+    //   - Proxy it to the homeserver unchanged
+    //   - Proxy it to the homeserver with some modifications
+    // * handleRegisterResponse - Handle the response from the homeserver
+    //   -
+    func handleRegisterRequest(req: Request) throws
+    -> EventLoopFuture<Response>
+    {
+        // What is this request?
+        // 1. Before UIAA -- No 'auth' parameter, no UIAA session
+        //   + Action: Pass it along to the homeserver
+        if req.hasUiaaSession == false {
+            return proxyRequestToHomeserver(req: req).map { hsResponse in
+                if let body = hsResponse.body {
+                    return Response(status: hsResponse.status,
+                                    body: .init(buffer: body))
+                } else {
+                    return Response(status: hsResponse.status)
+                }
+            }
+        }
+        
+        // What is this request?
+        // 2. Some UIAA stage
+        //   + Action: Is it for one of the stages that we handle?
+        //     - If so, handle the request and return our response without involving the homeserver
+        //     - If not, remove any mention of our stages and pass the request along to the homeserver
+        //       On the response, add back in the stages that we handle
+        
+        // What is this request?
+        // 3. After UIAA -- This is the actual registration request data
+        //   + Action: Enforce any username and password policies beyond those of the homeserver
+        //     - If one or both fails, send our own response back to the client
+        //     - If the requested username/password are good, pass them along to the homeserver
+        //       On the response, clean up any temporary data that we created (like pending subscriptions)
+        //       and add the new user to our table of current subscriptions
+    }
+
+    func handleRegisterResponse(hsRes: ClientResponse, for req: Request) throws
+    -> EventLoopFuture<Response>
+    {
+        
+    }
+    
+    func proxyRequestToHomeserver(req: Request) throws
+    -> EventLoopFuture<ClientResponse>
+    {
+        // Proxy the request to the "real" homeserver to handle it
+        let homeserverURI = URI(scheme: .http,
+                                host: homeserver,
+                                port: homeserver_port,
+                                path: req.url.path)
+
+        return req.client.post(homeserverURI,
+                               headers: req.headers) { hsRequest in
+            hsRequest.body = req.body.data
+        }
+    }
+    
+    // Initial attempt -- just throwing things together as I figure them out
     func handleRegister(req: Request) throws
     -> EventLoopFuture<Response>
     {
-        guard let apiVersion = req.parameters.get("version") else {
+        guard let apiVersion = req.parameters.get("version"),
+            apiVersions.contains(apiVersion) else {
             throw Abort(HTTPStatus.badRequest)
         }
-        if !apiVersions.contains(apiVersion) {
-            throw Abort(HTTPStatus.badRequest)
-        }
+
         
         print("AURIC\tPOST /register\n\tData = \(req.body.string ?? "(no body)")")
         
@@ -165,7 +227,6 @@ struct RegistrationController {
                         // Save it in the request's session
                         req.session.data["token"] = token
                         
-                        
                         // Next we need to tell the client that their token auth was successful
                         
                         // FIXME Ah crud, there's a race condition here
@@ -189,6 +250,7 @@ struct RegistrationController {
                             // Now that we have our pending slot in the database, we can go ahead with the registration process
                             // For now that means telling the client that their token-based auth was successful
                             // ARGH - So what do we do if we've finished, and there are no other remaining auth stages?
+                            // FIXME Look this up in the Matrix API docs...
                             var response = Response(status: .unauthorized)
                             //return req.eventLoop.makeSucceededFuture(response)
                             return response
@@ -220,7 +282,6 @@ struct RegistrationController {
                 let hsResponseData = try hsResponse.content.decode(UiaaResponseData.self)
                 var responseData = hsResponseData
 
-                /*
                 responseData.flows = []
                 for var flow in hsResponseData.flows {
                     if flow.stages == ["m.login.dummy"] {
@@ -235,7 +296,6 @@ struct RegistrationController {
                 }
                 print("Response data = ", responseData)
                 //return responseData
-                */
             
                 return responseData.encodeResponse(status: .unauthorized, for: req)
                 //let response = Response(status: .ok, body: .init(string: "Hello world"))
