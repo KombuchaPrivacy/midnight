@@ -16,9 +16,6 @@ public struct UiaaAuthData: Content {
     var token: String? //
 }
 
-public struct UiaaSessionOnly: Content {
-    var session: String
-}
 
 public struct UiaaRequestData: Content {
     var auth: UiaaAuthData

@@ -14,8 +14,12 @@ extension Request {
         typealias Value = Session
     }
     
-    public var uiaaSession: Session {
+    public var uiaaSession: Session? {
         get {
+            /* // The default Vapor SessionsMiddleware creates sessions by itself.
+               // But we can't do that.  Only the homeserver can create a session.
+               // So here we make our Session optional, and we can return nil if
+               // there is no existing session for a request.
             if let existing = self.storage[UiaaKey.self] {
                 return existing
             } else {
@@ -23,6 +27,8 @@ extension Request {
                 self.storage[UiaaKey.self] = new
                 return new
             }
+            */
+            self.storage[UiaaKey.self]
         }
         set(new) {
             self.storage[UiaaKey.self] = new

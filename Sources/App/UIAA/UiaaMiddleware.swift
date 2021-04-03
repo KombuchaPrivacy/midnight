@@ -8,7 +8,7 @@
 import Vapor
 
 public final class UiaaMiddleware: Middleware {
-    public typealias Credentials = UiaaSessionOnly
+    //public typealias Credentials = UiaaResponseSessionOnly
     
     public let driver: UiaaSessionDriver
     
@@ -19,11 +19,9 @@ public final class UiaaMiddleware: Middleware {
     public func respond(to request: Request, chainingTo next: Responder) -> EventLoopFuture<Response> {
         
         // Now we look for the session ID in the request
-        do {
-            let creds: Credentials
-            creds = try request.content.decode(Credentials.self)
-            print("UIAA\tGot creds  ")
-            let id = SessionID(string: creds.session)
+        if let uiaaReqData = try? request.content.decode(UiaaRequestData.self) {
+            print("UIAA\tGot UIAA request data")
+            let id = SessionID(string: uiaaReqData.auth.session)
             return self.driver.readSession(id, for: request).flatMap { data in
                 if let data = data {
                     // We've seen this session before
@@ -32,6 +30,7 @@ public final class UiaaMiddleware: Middleware {
                     request.uiaaSession = .init(id: id, data: data)
                 } else {
                     // First time we're seeing this one
+                    // FIXME Shouldn't this be an error?  The first time we see a new session ID, it should be coming from the *homeserver*, not the client.  Hmmm...
                     print("UIAA\tFound a new session")
                     // Create a new SessionData object for it
                     request.uiaaSession = .init(id: id, data: .init())
@@ -42,15 +41,13 @@ public final class UiaaMiddleware: Middleware {
                     return response
                 }
             }
-        } catch {
+        } else {
             // No credentials.  That's OK.
-            print("UIAA\tNo session")
+            print("UIAA\tNo session in the request")
             return next.respond(to: request).flatMap { response in
                 // Maybe we got a new session ID here in the response?
                 print("UIAA\tChecking for new session in response")
-                do {
-                    let creds: Credentials
-                    creds = try response.content.decode(Credentials.self)
+                if let creds = try? response.content.decode(UiaaResponseSessionOnly.self) {
                     print("UIAA\tFound new session in response")
                     var data = SessionData()
                     data["session"] = creds.session
@@ -62,7 +59,7 @@ public final class UiaaMiddleware: Middleware {
                             return response
                         }
 
-                } catch {
+                } else {
                     print("UIAA\tNo new session in response")
                     return request.eventLoop.makeSucceededFuture(response)
                 }

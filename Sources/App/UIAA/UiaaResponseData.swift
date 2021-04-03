@@ -20,3 +20,7 @@ struct UiaaResponseData: Content {
     var completed: [String]?
     var session: String
 }
+
+public struct UiaaResponseSessionOnly: Content {
+    var session: String
+}
