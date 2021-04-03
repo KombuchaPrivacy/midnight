@@ -15,7 +15,7 @@ final class AppTests: XCTestCase {
 }
 
 final class AuricTests: XCTestCase {
-    public typealias Credentials = UiaaSessionOnly
+    public typealias Credentials = UiaaResponseSessionOnly
 
     func _register_second_request(_ app: Application, session: String) throws {
         try app.test(.POST,

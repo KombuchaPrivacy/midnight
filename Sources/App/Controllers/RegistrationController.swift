@@ -126,7 +126,60 @@ struct RegistrationController {
             .delete()
     }
     
+    func handleSignupTokenRequest(req: Request, token: String)
+    -> EventLoopFuture<Response>
+    {
+        return validateSignupToken(token, forRequest: req)
+            .flatMap { numSlots in
+                // The token is valid
+                // Save it in the request's session
+                req.session.data["token"] = token
+                
+                // Create a pending "reservation" so the client will be able
+                // to subscribe with this token
+                return createPendingSubscription(for: req, given: numSlots).map {
+                    // Whew!
+                    // Now that we have our pending slot in the database, we can go ahead with the registration process
+                    // For now that means telling the client that their token-based auth was successful
+                    // ARGH - So what do we do if we've finished, and there are no other remaining auth stages?
+                    // FIXME Look this up in the Matrix API docs...
+                    // FIXME Maybe if this was the last UIAA stage, we're supposed to forward the request on to the homeserver?
+                    var response = Response(status: .unauthorized)
+                    //return req.eventLoop.makeSucceededFuture(response)
+                    return response
+                }
+            }
+    }
     
+    func handleUiaaRequest(req: Request, with data: UiaaRequestData) //throws
+    -> EventLoopFuture<Response>
+    {
+        // Is this UIAA stage one of ours?
+        // - If so, handle it.
+        // - If not, pass the request along to the homeserver.
+        //   Maybe it knows what to do with this one.
+        switch data.auth.type {
+        case "social.kombucha.signup_token":
+            return handleSignupTokenRequest(req: req, token: data.auth.token)
+        default:
+            return proxyRequestToHomeserver(req: req).map { hsResponse in
+                return proxyResponseToClientWithAddedStages(res: hsResponse)
+            }
+        }
+    }
+    
+    func proxyResponseToClientWithAddedStages(res: ClientResponse)
+    -> EventLoopFuture<Response>
+    {
+       if let body = res.body {
+           // FIXME This is where we need to insert our own UIAA stages
+           // in the response before it goes back to the client
+           return Response(status: hsResponse.status,
+                           body: .init(buffer: body))
+       } else {
+           return Response(status: hsResponse.status)
+       }
+    }
     
     // Improved approach.  Two core functions:
     // * handleRegisterRequest - Looks at the request and decides what to do with it
@@ -141,15 +194,11 @@ struct RegistrationController {
         // What is this request?
         // 1. Before UIAA -- No 'auth' parameter, no UIAA session
         //   + Action: Pass it along to the homeserver
-        if req.hasUiaaSession == false {
-            return proxyRequestToHomeserver(req: req).map { hsResponse in
-                if let body = hsResponse.body {
-                    return Response(status: hsResponse.status,
-                                    body: .init(buffer: body))
-                } else {
-                    return Response(status: hsResponse.status)
-                }
+        guard let session = req.uiaaSession else {
+             future = try proxyRequestToHomeserver(req: req).map { hsResponse in
+                return proxyResponseToClientWithAddedStages(res: hsResponse)
             }
+            return future
         }
         
         // What is this request?
@@ -158,6 +207,10 @@ struct RegistrationController {
         //     - If so, handle the request and return our response without involving the homeserver
         //     - If not, remove any mention of our stages and pass the request along to the homeserver
         //       On the response, add back in the stages that we handle
+        if let requestData = try? req.content.decode(UiaaRequestData.self) {
+            return handleUiaaRequest(req: req, with: requestData)
+        }
+        
         
         // What is this request?
         // 3. After UIAA -- This is the actual registration request data
@@ -166,6 +219,7 @@ struct RegistrationController {
         //     - If the requested username/password are good, pass them along to the homeserver
         //       On the response, clean up any temporary data that we created (like pending subscriptions)
         //       and add the new user to our table of current subscriptions
+
     }
 
     func handleRegisterResponse(hsRes: ClientResponse, for req: Request) throws
