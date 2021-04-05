@@ -137,16 +137,18 @@ struct RegistrationController {
                 
                 // Create a pending "reservation" so the client will be able
                 // to subscribe with this token
-                return createPendingSubscription(for: req, given: numSlots).map {
+                return createPendingSubscription(for: req, given: numSlots).flatMap {
                     // Whew!
                     // Now that we have our pending slot in the database, we can go ahead with the registration process
                     // For now that means telling the client that their token-based auth was successful
                     // ARGH - So what do we do if we've finished, and there are no other remaining auth stages?
                     // FIXME Look this up in the Matrix API docs...
                     // FIXME Maybe if this was the last UIAA stage, we're supposed to forward the request on to the homeserver?
-                    var response = Response(status: .unauthorized)
+                    //var response = Response(status: .unauthorized)
                     //return req.eventLoop.makeSucceededFuture(response)
-                    return response
+                    
+                    // FIXME For now, just return a 5xx error and tell the client we haven't done this part yet
+                    return req.eventLoop.makeFailedFuture(Abort(.notImplemented, reason: "FIXME Not implemented yet"))
                 }
             }
     }
@@ -160,25 +162,29 @@ struct RegistrationController {
         //   Maybe it knows what to do with this one.
         switch data.auth.type {
         case "social.kombucha.signup_token":
-            return handleSignupTokenRequest(req: req, token: data.auth.token)
+            guard let token = data.auth.token else {
+                return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "No token provided"))
+            }
+            return handleSignupTokenRequest(req: req, token: token)
         default:
-            return proxyRequestToHomeserver(req: req).map { hsResponse in
-                return proxyResponseToClientWithAddedStages(res: hsResponse)
+            return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
+                return handleUiaaResponse(res: hsResponse, for: req)
             }
         }
     }
     
-    func proxyResponseToClientWithAddedStages(res: ClientResponse)
+    func handleUiaaResponse(res: ClientResponse, for req: Request)
     -> EventLoopFuture<Response>
     {
-       if let body = res.body {
-           // FIXME This is where we need to insert our own UIAA stages
-           // in the response before it goes back to the client
-           return Response(status: hsResponse.status,
-                           body: .init(buffer: body))
-       } else {
-           return Response(status: hsResponse.status)
-       }
+        let response: Response
+        if let body = res.body {
+            // FIXME This is where we need to insert our own UIAA stages
+            // in the response before it goes back to the client
+            response = Response(status: res.status, body: .init(buffer: body))
+        } else {
+            response = Response(status: res.status)
+        }
+        return req.eventLoop.makeSucceededFuture(response)
     }
     
     // Improved approach.  Two core functions:
@@ -194,11 +200,11 @@ struct RegistrationController {
         // What is this request?
         // 1. Before UIAA -- No 'auth' parameter, no UIAA session
         //   + Action: Pass it along to the homeserver
-        guard let session = req.uiaaSession else {
-             future = try proxyRequestToHomeserver(req: req).map { hsResponse in
-                return proxyResponseToClientWithAddedStages(res: hsResponse)
+        //     We should expect the start of a UIAA session as the response
+        guard req.hasUiaaSession else {
+            return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
+                return handleUiaaResponse(res: hsResponse, for: req)
             }
-            return future
         }
         
         // What is this request?
@@ -206,7 +212,7 @@ struct RegistrationController {
         //   + Action: Is it for one of the stages that we handle?
         //     - If so, handle the request and return our response without involving the homeserver
         //     - If not, remove any mention of our stages and pass the request along to the homeserver
-        //       On the response, add back in the stages that we handle
+        //     On the response, add back in the stages that we handle
         if let requestData = try? req.content.decode(UiaaRequestData.self) {
             return handleUiaaRequest(req: req, with: requestData)
         }
@@ -219,16 +225,31 @@ struct RegistrationController {
         //     - If the requested username/password are good, pass them along to the homeserver
         //       On the response, clean up any temporary data that we created (like pending subscriptions)
         //       and add the new user to our table of current subscriptions
-
+        // FIXME TODO
+        
+        return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.notImplemented, reason: "FIXME We don't handle actual registration data yet"))
     }
 
-    func handleRegisterResponse(hsRes: ClientResponse, for req: Request) throws
+    // Handle the actual response from the Homeserver on the /register endpoint
+    // Mostly we just pass the response along unmodified to the client
+    func handleRegisterResponse(hsResponse: ClientResponse, for req: Request) //throws
     -> EventLoopFuture<Response>
     {
-        
+        let response: Response
+        if let body = hsResponse.body {
+            // This is where we should check for a UIAA session that has ended
+            // Did the request have a session, but the response did not?
+            // Then the UIAA session has finished, and we should remove it.
+            // FIXME TODO
+            
+            response = Response(status: hsResponse.status, body: .init(buffer: body))
+        } else {
+            response = Response(status: hsResponse.status)
+        }
+        return req.eventLoop.makeSucceededFuture(response)
     }
     
-    func proxyRequestToHomeserver(req: Request) throws
+    func proxyRequestToHomeserver(req: Request) //throws
     -> EventLoopFuture<ClientResponse>
     {
         // Proxy the request to the "real" homeserver to handle it
