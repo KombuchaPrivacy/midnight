@@ -21,7 +21,10 @@ public final class UiaaMiddleware: Middleware {
         // Now we look for the session ID in the request
         if let uiaaReqData = try? request.content.decode(UiaaRequestData.self) {
             print("UIAA\tGot UIAA request data")
-            let id = SessionID(string: uiaaReqData.auth.session)
+            guard let sessionId = uiaaReqData.auth.session else {
+                return request.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "UIAA request has no session identifier"))
+            }
+            let id = SessionID(string: sessionId)
             return self.driver.readSession(id, for: request).flatMap { data in
                 if let data = data {
                     // We've seen this session before

@@ -17,6 +17,7 @@ struct RegistrationController {
     
     var app: Application
     var homeserver: String
+    var homeserver_scheme: URI.Scheme = .https
     var homeserver_port: Int
     var apiVersions: [String]
     

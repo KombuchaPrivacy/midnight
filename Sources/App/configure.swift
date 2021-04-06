@@ -24,6 +24,7 @@ public func configure(_ app: Application) throws {
 
     let reg = RegistrationController(app: app,
                                      homeserver: "192.168.1.89",
+                                     homeserver_scheme: .http,
                                      homeserver_port: 6167,
                                      apiVersions: ["r0", "v1"])
     
