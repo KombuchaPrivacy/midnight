@@ -10,12 +10,8 @@ import Vapor
 import Fluent
 
 struct RegistrationController {
-    //let homeserver = "matrix-synapse"
-    //static let homeserver = "192.168.1.89"
-    //static let homeserver_port = 6167
-    //static let apiVersions = ["r0", "v1"]
-    
     var app: Application
+    
     var homeserver: String
     var homeserver_scheme: URI.Scheme = .https
     var homeserver_port: Int
@@ -174,18 +170,56 @@ struct RegistrationController {
         }
     }
     
-    func handleUiaaResponse(res: ClientResponse, for req: Request)
+    func proxyResponseToClientUnmodified(res: ClientResponse, for req: Request)
     -> EventLoopFuture<Response>
     {
+        print("\t\(#function): Client response status = \(res.status)")
         let response: Response
         if let body = res.body {
+            print("\t\(#function): Got a response with content")
             // FIXME This is where we need to insert our own UIAA stages
             // in the response before it goes back to the client
             response = Response(status: res.status, body: .init(buffer: body))
         } else {
+            print("\t\(#function): Got empty response")
             response = Response(status: res.status)
         }
         return req.eventLoop.makeSucceededFuture(response)
+    }
+    
+    func handleUiaaResponse(res: ClientResponse, for req: Request)
+    -> EventLoopFuture<Response>
+    {
+        let response: Response
+        print("AURIC\tHandling UIAA Response")
+        
+        // The only response that we need to work with is a 401
+        // Everything else we return unmodified
+        guard res.status == HTTPStatus.unauthorized else {
+            print("AURIC\tUIAA response is not 401; Returning unmodified")
+            return proxyResponseToClientUnmodified(res: res, for: req)
+        }
+        
+        guard let hsResponseData = try? res.content.decode(UiaaResponseData.self) else {
+            return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Couldn't parse Matrix data"))
+        }
+        
+        var ourResponseData = hsResponseData
+        ourResponseData.flows = []
+        for var flow in hsResponseData.flows {
+            if flow.stages == ["m.login.dummy"] {
+                flow.stages = ["social.kombucha.signup_token"]
+            } else if !flow.stages.contains("social.kombucha.signup_token") {
+                print("Inserting signup_token in auth flows")
+                flow.stages.insert("social.kombucha.signup_token", at: 0)
+                print("Stages = ", flow.stages)
+            }
+            print("Flow = ", flow)
+            ourResponseData.flows.append(flow)
+        }
+        print("\t\(#function): Returning response data = \(ourResponseData)")
+        
+        return ourResponseData.encodeResponse(status: .unauthorized, for: req)
     }
     
     // Improved approach.  Two core functions:
@@ -198,12 +232,20 @@ struct RegistrationController {
     func handleRegisterRequest(req: Request) throws
     -> EventLoopFuture<Response>
     {
+        // First: Make sure this is a valid request
+        guard let apiVersion = req.parameters.get("version"),
+            apiVersions.contains(apiVersion) else {
+            return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "Invalid version in request"))
+        }
+        
         // What is this request?
         // 1. Before UIAA -- No 'auth' parameter, no UIAA session
         //   + Action: Pass it along to the homeserver
         //     We should expect the start of a UIAA session as the response
         guard req.hasUiaaSession else {
+            print("AURIC\t1. No UIAA session in request.  Proxying...")
             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
+                print("AURIC\t2. Got proxy response -- Status = \(hsResponse.status)")
                 return handleUiaaResponse(res: hsResponse, for: req)
             }
         }
@@ -254,19 +296,27 @@ struct RegistrationController {
     -> EventLoopFuture<ClientResponse>
     {
         // Proxy the request to the "real" homeserver to handle it
-        let homeserverURI = URI(scheme: .http,
+        let homeserverURI = URI(scheme: homeserver_scheme,
                                 host: homeserver,
-                                port: homeserver_port,
+                                //port: homeserver_port,
                                 path: req.url.path)
+        print("AURIC\tProxying request to homeserver at \(homeserverURI)")
 
         return req.client.post(homeserverURI,
                                headers: req.headers) { hsRequest in
+            // Patch up the headers to point to the homeserver instead of us
+            // This may not be necessary in deployment, when we're all behind the nginx proxy anyway, but it certainly helps during development where Auric is running on the local machine
+            hsRequest.headers.remove(name: "Host")
+            hsRequest.headers.add(name: "Host", value: homeserver)
+
+            // Copy the request body that we received into
+            // our new request that we're sending to the HS
             hsRequest.body = req.body.data
         }
     }
     
     // Initial attempt -- just throwing things together as I figure them out
-    func handleRegister(req: Request) throws
+    func _old_handleRegister(req: Request) throws
     -> EventLoopFuture<Response>
     {
         guard let apiVersion = req.parameters.get("version"),
