@@ -23,9 +23,9 @@ public func configure(_ app: Application) throws {
     app.databases.use(.sqlite(.file("db.sqlite")), as: .sqlite)
 
     let reg = RegistrationController(app: app,
-                                     homeserver: "192.168.1.89",
-                                     homeserver_scheme: .http,
-                                     homeserver_port: 6167,
+                                     homeserver: "beta.kombucha.social",
+                                     homeserver_scheme: .https,
+                                     homeserver_port: 443,
                                      apiVersions: ["r0", "v1"])
     
     // register routes
