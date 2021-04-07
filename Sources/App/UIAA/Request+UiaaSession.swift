@@ -36,6 +36,6 @@ extension Request {
     }
     
     public var hasUiaaSession: Bool {
-        nil == self.storage[UiaaKey.self]
+        nil != self.storage[UiaaKey.self]
     }
 }
