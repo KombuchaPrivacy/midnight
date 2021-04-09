@@ -132,22 +132,53 @@ struct RegistrationController {
             .flatMap { numSlots in
                 // The token is valid
                 // Save it in the request's session
-                req.session.data["token"] = token
+                guard let session = req.uiaaSession else {
+                    return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Couldn't find authentication session"))
+                }
+                
+                var state = session.data.state
+                
+                session.data["token"] = token
                 
                 // Create a pending "reservation" so the client will be able
                 // to subscribe with this token
                 return createPendingSubscription(for: req, given: numSlots).flatMap {
-                    // Whew!
+
                     // Now that we have our pending slot in the database, we can go ahead with the registration process
                     // For now that means telling the client that their token-based auth was successful
-                    // ARGH - So what do we do if we've finished, and there are no other remaining auth stages?
-                    // FIXME Look this up in the Matrix API docs...
-                    // FIXME Maybe if this was the last UIAA stage, we're supposed to forward the request on to the homeserver?
-                    //var response = Response(status: .unauthorized)
-                    //return req.eventLoop.makeSucceededFuture(response)
+                                        
+                    // FIXME ah crap, the uiaaSession.data object is really
+                    // just a stupid [String: String]
+                    // It's not a [String: Any]
+                    // Argh.
+                    // So it sounds like we really need to keep track of a
+                    // UIAA session state object.
+                    // Which would actually be basically just what we're now
+                    // calling UiaaResponseData
+                    // So let's just rename it "UiaaSessionState" and be done
                     
-                    // FIXME For now, just return a 5xx error and tell the client we haven't done this part yet
-                    return req.eventLoop.makeFailedFuture(Abort(.notImplemented, reason: "FIXME Not implemented yet"))
+                    let flows = state.flows
+                    
+                    let sessionId = state.session
+                    
+                    // Append this stage to the list of completed stages
+                    var completed: [String] = state.completed ?? []
+                    completed.append(LOGIN_STAGE_SIGNUP_TOKEN)
+                    state.completed = completed
+                    
+                    // Copy the list of params (if any)
+                    let params = state.params
+                    
+                    let responseData = UiaaSessionState(flows: flows,
+                                                        params: params,
+                                                        completed: completed,
+                                                        session: sessionId)
+                    
+                    // FIXME If this was the last stage, then we should
+                    // return 200 OK here
+                    let status: HTTPStatus = .unauthorized
+                    
+                    return responseData.encodeResponse(status: status, for: req)
                 }
             }
     }
@@ -202,7 +233,7 @@ struct RegistrationController {
             return proxyResponseToClientUnmodified(res: res, for: req)
         }
         
-        guard let hsResponseData = try? res.content.decode(UiaaResponseData.self) else {
+        guard let hsResponseData = try? res.content.decode(UiaaSessionState.self) else {
             return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Couldn't parse Matrix data"))
         }
         
@@ -407,7 +438,7 @@ struct RegistrationController {
             }
             
             do {
-                let hsResponseData = try hsResponse.content.decode(UiaaResponseData.self)
+                let hsResponseData = try hsResponse.content.decode(UiaaSessionState.self)
                 var responseData = hsResponseData
 
                 responseData.flows = []

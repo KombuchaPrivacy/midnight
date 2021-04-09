@@ -8,12 +8,12 @@
 import Foundation
 import Vapor
 
-public struct UiaaSessionDriver: SessionDriver {
+public struct UiaaSessionDriver {
     private var store: Store
     
     // Is this only here to provide mutability??
     public final class Store {
-        public var dict: ConcurrentDictionary<SessionID,SessionData>
+        public var dict: ConcurrentDictionary<SessionID,UiaaSessionData>
         public init(_ n: Int = 32) {
             self.dict = .init(n)
         }
@@ -24,26 +24,21 @@ public struct UiaaSessionDriver: SessionDriver {
     }
     
     public func createSession(
-        _ data: SessionData,
+        _ data: UiaaSessionData,
         for request: Request
     ) -> EventLoopFuture<SessionID> {
-        guard let id = data["session"] else {
-            return request.eventLoop
-                .makeFailedFuture(
-                    Abort(.badRequest, reason: "No session ID")
-                )
-        }
+        let id = data.state.session
         let sessionID = SessionID(string: id)
         self.store.dict[sessionID] = data
         return request.eventLoop.makeSucceededFuture(sessionID)
     }
     
-    public func readSession(_ sessionID: SessionID, for request: Request) -> EventLoopFuture<SessionData?> {
+    public func readSession(_ sessionID: SessionID, for request: Request) -> EventLoopFuture<UiaaSessionData?> {
         let data = self.store.dict[sessionID]
         return request.eventLoop.makeSucceededFuture(data)
     }
     
-    public func updateSession(_ sessionID: SessionID, to data: SessionData, for request: Request) -> EventLoopFuture<SessionID> {
+    public func updateSession(_ sessionID: SessionID, to data: UiaaSessionData, for request: Request) -> EventLoopFuture<SessionID> {
         self.store.dict[sessionID] = data
         return request.eventLoop.makeSucceededFuture(sessionID)
     }

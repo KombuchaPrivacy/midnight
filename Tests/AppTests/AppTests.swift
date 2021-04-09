@@ -34,7 +34,7 @@ final class AuricTests: XCTestCase {
                                             ])
                  },
                  afterResponse: { res in
-                    let responseData = try res.content.decode(UiaaResponseData.self)
+                    let responseData = try res.content.decode(UiaaSessionState.self)
                     XCTAssertEqual(session, responseData.session)
                  }
                 )
@@ -46,7 +46,7 @@ final class AuricTests: XCTestCase {
                  afterResponse: { res in
                     XCTAssertEqual(res.status, .ok)
 
-                    let responseData = try res.content.decode(UiaaResponseData.self)
+                    let responseData = try res.content.decode(UiaaSessionState.self)
                     XCTAssertNotNil(responseData)
                     try _register_second_request(app, session: responseData.session)
                  }

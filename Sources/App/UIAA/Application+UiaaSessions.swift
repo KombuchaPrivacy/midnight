@@ -15,7 +15,7 @@ extension Application {
     
     public struct UiaaSessions {
         // UIAA sessions are ephemeral -- We don't need long term storage
-        public typealias Store = ConcurrentDictionary<SessionID,SessionData>
+        public typealias Store = ConcurrentDictionary<SessionID,UiaaSessionData>
         //var data: Store
         let application: Application
         

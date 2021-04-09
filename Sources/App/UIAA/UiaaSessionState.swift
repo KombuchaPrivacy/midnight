@@ -8,11 +8,13 @@
 import Fluent
 import Vapor
 
-struct UiaaAuthFlow: Content {
+public struct UiaaAuthFlow: Content {
     var stages: [String]
 }
 
-struct UiaaResponseData: Content {
+typealias UiaaStateParams = [String: [String:String]]?
+
+public struct UiaaSessionState: Content {
     var errcode: String?
     var error: String?
     var flows: [UiaaAuthFlow]
@@ -21,6 +23,6 @@ struct UiaaResponseData: Content {
     var session: String
 }
 
-public struct UiaaResponseSessionOnly: Content {
+public struct UiaaSessionStateBare: Content {
     var session: String
 }

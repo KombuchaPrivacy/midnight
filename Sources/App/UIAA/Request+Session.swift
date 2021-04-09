@@ -11,10 +11,10 @@ import Vapor
 extension Request {
             
     private struct UiaaKey: StorageKey {
-        typealias Value = Session
+        typealias Value = UiaaSession
     }
     
-    public var uiaaSession: Session? {
+    public var uiaaSession: UiaaSession? {
         get {
             /* // The default Vapor SessionsMiddleware creates sessions by itself.
                // But we can't do that.  Only the homeserver can create a session.

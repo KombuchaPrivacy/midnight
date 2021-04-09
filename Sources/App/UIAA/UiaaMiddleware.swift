@@ -26,18 +26,18 @@ public final class UiaaMiddleware: Middleware {
             }
             let id = SessionID(string: sessionId)
             return self.driver.readSession(id, for: request).flatMap { data in
-                if let data = data {
-                    // We've seen this session before
-                    print("UIAA\tFound an existing session")
-                    // Attach its existing data to it
-                    request.uiaaSession = .init(id: id, data: data)
-                } else {
+                guard let data = data else {
                     // First time we're seeing this one
                     // FIXME Shouldn't this be an error?  The first time we see a new session ID, it should be coming from the *homeserver*, not the client.  Hmmm...
-                    print("UIAA\tFound a new session")
-                    // Create a new SessionData object for it
-                    request.uiaaSession = .init(id: id, data: .init())
+                    print("UIAA\tFound a new unexpected session")
+                    return request.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Unknown session \(sessionId)"))
                 }
+                
+                // We've seen this session before
+                print("UIAA\tFound an existing session")
+                // Attach its existing data to it
+                request.uiaaSession = .init(id: id, data: data)
+
                 return next.respond(to: request).map { response in
                     // Check whether we need to remove the session
                     print("UIAA\tChecking for existing session in response")
@@ -50,10 +50,10 @@ public final class UiaaMiddleware: Middleware {
             return next.respond(to: request).flatMap { response in
                 // Maybe we got a new session ID here in the response?
                 print("UIAA\tChecking for new session in response")
-                if let creds = try? response.content.decode(UiaaResponseSessionOnly.self) {
+                if let initialState = try? response.content.decode(UiaaSessionState.self) {
                     print("UIAA\tFound new session in response")
-                    var data = SessionData()
-                    data["session"] = creds.session
+                    var data = UiaaSessionData(initialData: [:], initialState: initialState)
+                    data["session"] = initialState.session
                     
                     return self.driver
                         .createSession(data, for: request)
