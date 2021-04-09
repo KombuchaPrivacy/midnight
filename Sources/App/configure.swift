@@ -8,6 +8,10 @@ public func configure(_ app: Application) throws {
     // uncomment to serve files from /Public folder
     // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     
+    app.migrations.add(SignupTokenMigration())
+    
+    app.commands.use(CreateTokenCommand(), as: "create-token")
+    
     app.middleware.use(app.uiaaSessions.middleware)
 
     /*

@@ -9,6 +9,8 @@ import Foundation
 import Vapor
 import Fluent
 
+let LOGIN_STAGE_SIGNUP_TOKEN = "social.kombucha.login.signup_token"
+
 struct RegistrationController {
     var app: Application
     
@@ -67,7 +69,7 @@ struct RegistrationController {
                     .count()
                     .flatMap { count in
                         // How many slots are still available?
-                        let available = Int(signupToken.maxSignups) - count
+                        let available = Int(signupToken.slots) - count
                         guard available > 0 else {
                             return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "No more signups allowed on this token"))
                         }
@@ -158,7 +160,7 @@ struct RegistrationController {
         // - If not, pass the request along to the homeserver.
         //   Maybe it knows what to do with this one.
         switch data.auth.type {
-        case "social.kombucha.signup_token":
+        case LOGIN_STAGE_SIGNUP_TOKEN:
             guard let token = data.auth.token else {
                 return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "No token provided"))
             }
@@ -208,10 +210,10 @@ struct RegistrationController {
         ourResponseData.flows = []
         for var flow in hsResponseData.flows {
             if flow.stages == ["m.login.dummy"] {
-                flow.stages = ["social.kombucha.signup_token"]
-            } else if !flow.stages.contains("social.kombucha.signup_token") {
+                flow.stages = [LOGIN_STAGE_SIGNUP_TOKEN]
+            } else if !flow.stages.contains(LOGIN_STAGE_SIGNUP_TOKEN) {
                 print("Inserting signup_token in auth flows")
-                flow.stages.insert("social.kombucha.signup_token", at: 0)
+                flow.stages.insert(LOGIN_STAGE_SIGNUP_TOKEN, at: 0)
                 print("Stages = ", flow.stages)
             }
             print("Flow = ", flow)
@@ -235,7 +237,7 @@ struct RegistrationController {
         // First: Make sure this is a valid request
         guard let apiVersion = req.parameters.get("version"),
             apiVersions.contains(apiVersion) else {
-            return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "Invalid version in request"))
+            return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "Invalid API version in request"))
         }
         
         // What is this request?
