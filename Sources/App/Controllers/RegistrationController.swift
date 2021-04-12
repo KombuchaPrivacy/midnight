@@ -38,9 +38,8 @@ struct RegistrationController {
         let token = userToken
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
-        guard token.count == 16,
-              let _ = UInt64(token, radix: 16) else {
-            return req.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Bad token"))
+        guard SignupToken.validateFormat(token: token) else {
+            return req.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Invalid token"))
         }
         
         // Once we've got a token that's of the proper form,
@@ -53,7 +52,7 @@ struct RegistrationController {
             .first()
             .flatMap { maybeValidToken in
                 guard let signupToken = maybeValidToken else {
-                    return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "Invalid token"))
+                    return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "No such token"))
                 }
                 // Check whether the token is expired
                 // If there's no expiration date, then the token is always valid for now
@@ -71,7 +70,7 @@ struct RegistrationController {
                         // How many slots are still available?
                         let available = Int(signupToken.slots) - count
                         guard available > 0 else {
-                            return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "No more signups allowed on this token"))
+                            return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "No more signups allowed with this token"))
                         }
                         return req.eventLoop.makeSucceededFuture(available)
                     }
@@ -138,6 +137,9 @@ struct RegistrationController {
                 
                 var state = session.data.state
                 
+                // Save the token with our session so we can find it later
+                // We will need it at the end, when it's time to create the
+                // subscription record in the database
                 session.data["token"] = token
                 
                 // Create a pending "reservation" so the client will be able
@@ -146,16 +148,6 @@ struct RegistrationController {
 
                     // Now that we have our pending slot in the database, we can go ahead with the registration process
                     // For now that means telling the client that their token-based auth was successful
-                                        
-                    // FIXME ah crap, the uiaaSession.data object is really
-                    // just a stupid [String: String]
-                    // It's not a [String: Any]
-                    // Argh.
-                    // So it sounds like we really need to keep track of a
-                    // UIAA session state object.
-                    // Which would actually be basically just what we're now
-                    // calling UiaaResponseData
-                    // So let's just rename it "UiaaSessionState" and be done
                     
                     let flows = state.flows
                     
@@ -165,6 +157,8 @@ struct RegistrationController {
                     var completed: [String] = state.completed ?? []
                     completed.append(LOGIN_STAGE_SIGNUP_TOKEN)
                     state.completed = completed
+                    // Whoops, we also need to save this into our session state struct
+                    session.data.state.completed = completed
                     
                     // Copy the list of params (if any)
                     let params = state.params
@@ -176,7 +170,13 @@ struct RegistrationController {
                     
                     // FIXME If this was the last stage, then we should
                     // return 200 OK here
-                    let status: HTTPStatus = .unauthorized
+                    var status: HTTPStatus = .unauthorized
+                    for flow in flows {
+                        if flow.isSatisfiedBy(completed: completed) {
+                            status = .ok
+                            break
+                        }
+                    }
                     
                     return responseData.encodeResponse(status: status, for: req)
                 }
@@ -223,13 +223,14 @@ struct RegistrationController {
     func handleUiaaResponse(res: ClientResponse, for req: Request)
     -> EventLoopFuture<Response>
     {
-        let response: Response
         print("AURIC\tHandling UIAA Response")
         
         // The only response that we need to work with is a 401
         // Everything else we return unmodified
         guard res.status == HTTPStatus.unauthorized else {
             print("AURIC\tUIAA response is not 401; Returning unmodified")
+            // FIXME Make sure that 401's are all we need to touch
+            //       Could there be 403's where we need to re-write the flows?
             return proxyResponseToClientUnmodified(res: res, for: req)
         }
         
@@ -255,13 +256,137 @@ struct RegistrationController {
         return ourResponseData.encodeResponse(status: .unauthorized, for: req)
     }
     
+    func validateUsername(username: String)
+    -> Bool {
+        let ALLOWED_PUNCTUATION = "-.=_"
+        
+        func getLocalPart(username: String) -> Substring? {
+            if username.contains(":") {
+                let toks = username.lowercased().split(separator: ":")
+                if toks.count != 2 {
+                    return nil
+                }
+                let serverName = toks.last
+                if serverName != "kombucha.social" {
+                    return nil
+                }
+                let user = toks.first!
+                if user.starts(with: "@") {
+                    return user.dropFirst()
+                }
+                return user
+            } else {
+                // They're only asking for a bare username, no domain
+                return username.suffix(from: username.startIndex)
+            }
+        }
+        
+        guard let localPart = getLocalPart(username: username) else {
+            return false
+        }
+
+        
+        // cvw: Not part of the Matrix spec, but IMO a slash is totally shady in
+        //      something that will make up part of a URL path.
+        //      Rather than chance it and hope that every stage in our chain of
+        //      proxies (nginx etc) parses the Matrix endpoint URLs correctly,
+        //      we're just going to disallow the slash from the start
+        //      Heh.  If the guy from Guns N Roses, or Slashdot, wants an account,
+        //      they can talk to us individually.
+        if localPart.contains("/") {
+            return false
+        }
+        // This one is from the Matrix spec
+        if localPart.count > 255 - "@kombucha.social".count {
+            return false
+        }
+        // This one is from me, to keep our usernames looking (somewhat) sane and manageable:
+        if localPart.count > 32 {
+            return false
+        }
+        
+        // FIXME What if we want to make short usernames a "premium" / paid feature?
+        if localPart.count < 8 {
+            return false
+        }
+        
+        // We also want to check for some basic readability
+
+        var numAlphas = UInt(0);
+        var numNumerics = UInt(0);
+        var numPuncts = UInt(0);
+        
+        for c in localPart {
+            if !(c.isNumber || c.isLetter || ALLOWED_PUNCTUATION.contains(c)) {
+                return false
+            } else if c.isNumber {
+                numNumerics += 1
+            } else if c.isLetter {
+                numAlphas += 1
+            } else if c.isPunctuation {
+                numPuncts += 1
+            }
+        }
+        
+        // No usernames like ..._--_... or 911
+        // This also disallows raw phone numbers...  That's probably good.
+        // Although somebody could still do 867-5309_Jenny or 1-800-GOT-JUNK etc.
+        // I guess that's OK.
+        if numAlphas < 2 {
+            return false
+        }
+        
+        // No using leading or trailing punctuation to impersonate someone else,
+        // e.g. "_alice" to look like "alice" or "bob." to look like "bob"
+        // Sorry "__=-=__CoolDude__=-=__" this might not be the place for you...
+        if localPart.first!.isPunctuation || localPart.last!.isPunctuation {
+            return false
+        }
+        
+        // Whew.  If we made it all the way to here, then the username must be OK.
+        return true
+    }
+    
+    func validateAgainstBadlist(_ string: String, db: Database)
+    -> EventLoopFuture<Bool> {
+        let lower = string.lowercased()
+
+        // FIXME Cache this
+        return BadWord.query(on: db)
+            .field(\.$word)
+            .all()
+            .map { (badwords) -> Bool in
+                
+                for badword in badwords {
+                    if lower.contains(badword.word) {
+                        return false
+                    }
+                    let leetspeak = badword.word
+                        .replacingOccurrences(of: "4", with: "a")
+                        .replacingOccurrences(of: "3", with: "e")
+                        .replacingOccurrences(of: "1", with: "i")
+                        .replacingOccurrences(of: "0", with: "o")
+                        .replacingOccurrences(of: "5", with: "s")
+                        .replacingOccurrences(of: "7", with: "t")
+                        .replacingOccurrences(of: "9", with: "g")
+                        if lower.contains(leetspeak) {
+                            return false
+                        }
+                }
+        
+                // If we didn't match any of the bad words, it's probably OK
+                return true
+            }
+    }
+    
     // Improved approach.  Two core functions:
     // * handleRegisterRequest - Looks at the request and decides what to do with it
     //   - Handle it ourselves
     //   - Proxy it to the homeserver unchanged
     //   - Proxy it to the homeserver with some modifications
     // * handleRegisterResponse - Handle the response from the homeserver
-    //   -
+    //   - hmmm..  Not sure we really need a generic version of the response handler
+    //   - Different kinds of responses require different handlers
     func handleRegisterRequest(req: Request) throws
     -> EventLoopFuture<Response>
     {
@@ -270,6 +395,44 @@ struct RegistrationController {
             apiVersions.contains(apiVersion) else {
             return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "Invalid API version in request"))
         }
+        
+        // The Matrix CS API mandates that we do some early sanity checks on the requested account data
+        /*
+          Status code 400:
+
+          Part of the request was invalid. This may include one of the following error codes:
+
+          M_USER_IN_USE : The desired user ID is already taken.
+          M_INVALID_USERNAME : The desired user ID is not a valid user name.
+          M_EXCLUSIVE : The desired user ID is in the exclusive namespace claimed by an application service.
+          These errors may be returned at any stage of the registration process, including after authentication if the requested user ID was registered whilst the client was performing authentication.
+
+          Homeservers MUST perform the relevant checks and return these codes before performing User-Interactive Authentication, although they may also return them after authentication is completed if, for example, the requested user ID was registered whilst the client was performing authentication.
+        */
+        
+        // So how much of this do we want to follow?
+        // Answering M_USER_IN_USE would let an adversary map out the set of registered usernames.
+        //   * Maybe it's OK if we just rate limit it severely enough???
+        //   * Actually on 2nd thought, F that.
+        //     Make them at least show us a token first.
+        //     I don't want to answer this for the whole wide world.
+        //   * So we should check for M_USER_IN_USE *after* validating the token
+        // The others seem genuinely useful though.
+        // So, attempt to decode the registration request, and check for invalid and/or reserved usernames
+        guard let registrationRequestData = try? req.content.decode(RegistrationRequestBody.self) else {
+            return req.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Couldn't parse registration request"))
+        }
+        
+        // Check for M_INVALID_USERNAME
+        guard validateUsername(username: registrationRequestData.username) else {
+            let err = ResponseErrorContent(errcode: "M_INVALID_USERNAME", error: "The desired user ID is not a valid user name.")
+            return err.encodeResponse(status: .badRequest, for: req)
+        }
+        
+        // Check for M_EXCLUSIVE
+        // We're going to use this for all kinds of reserved things
+        
+        
         
         // What is this request?
         // 1. Before UIAA -- No 'auth' parameter, no UIAA session

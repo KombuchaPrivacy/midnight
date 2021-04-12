@@ -62,4 +62,19 @@ final class SignupToken: Model {
         self.createdBy = userId
         self.expiresAt = expiresAt
     }
+    
+    static func validateFormat(token: String) -> Bool {
+        let toks = token.split(separator: "-")
+        guard toks.count == 4 else {
+            return false
+        }
+
+        for tok in toks {
+            guard let _ = UInt16(tok, radix: 16) else {
+                return false
+            }
+        }
+        
+        return true
+    }
 }

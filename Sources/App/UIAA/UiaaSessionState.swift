@@ -10,6 +10,10 @@ import Vapor
 
 public struct UiaaAuthFlow: Content {
     var stages: [String]
+    
+    func isSatisfiedBy(completed: [String]) -> Bool {
+        completed.starts(with: stages)
+    }
 }
 
 typealias UiaaStateParams = [String: [String:String]]?
