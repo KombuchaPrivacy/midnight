@@ -351,7 +351,8 @@ struct RegistrationController {
     -> EventLoopFuture<Bool>
     {
         let lower = string.lowercased()
-
+        let BADLIST_CHECK_LEETSPEAK: Bool = true
+        
         // FIXME Cache this
         return BadWord.query(on: req.db)
             .field(\.$word)
@@ -362,17 +363,19 @@ struct RegistrationController {
                     if lower.contains(badWord.word) {
                         return false
                     }
-                    let leetspeak = badWord.word
-                        .replacingOccurrences(of: "4", with: "a")
-                        .replacingOccurrences(of: "3", with: "e")
-                        .replacingOccurrences(of: "1", with: "i")
-                        .replacingOccurrences(of: "0", with: "o")
-                        .replacingOccurrences(of: "5", with: "s")
-                        .replacingOccurrences(of: "7", with: "t")
-                        .replacingOccurrences(of: "9", with: "g")
-                        if lower.contains(leetspeak) {
-                            return false
-                        }
+                    if BADLIST_CHECK_LEETSPEAK {
+                        let leetspeak = badWord.word
+                            .replacingOccurrences(of: "4", with: "a")
+                            .replacingOccurrences(of: "3", with: "e")
+                            .replacingOccurrences(of: "1", with: "i")
+                            .replacingOccurrences(of: "0", with: "o")
+                            .replacingOccurrences(of: "5", with: "s")
+                            .replacingOccurrences(of: "7", with: "t")
+                            .replacingOccurrences(of: "9", with: "g")
+                            if lower.contains(leetspeak) {
+                                return false
+                            }
+                    }
                 }
         
                 // If we didn't match any of the bad words, it's probably OK
