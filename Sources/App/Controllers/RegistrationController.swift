@@ -256,7 +256,7 @@ struct RegistrationController {
         return ourResponseData.encodeResponse(status: .unauthorized, for: req)
     }
     
-    func validateUsername(username: String)
+    func validateUsernameFormat(username: String)
     -> Bool {
         let ALLOWED_PUNCTUATION = "-.=_"
         
@@ -347,21 +347,22 @@ struct RegistrationController {
         return true
     }
     
-    func validateAgainstBadlist(_ string: String, db: Database)
-    -> EventLoopFuture<Bool> {
+    func validateAgainstBadlist(_ string: String, for req: Request)
+    -> EventLoopFuture<Bool>
+    {
         let lower = string.lowercased()
 
         // FIXME Cache this
-        return BadWord.query(on: db)
+        return BadWord.query(on: req.db)
             .field(\.$word)
             .all()
-            .map { (badwords) -> Bool in
+            .map { (badWords) -> Bool in
                 
-                for badword in badwords {
-                    if lower.contains(badword.word) {
+                for badWord in badWords {
+                    if lower.contains(badWord.word) {
                         return false
                     }
-                    let leetspeak = badword.word
+                    let leetspeak = badWord.word
                         .replacingOccurrences(of: "4", with: "a")
                         .replacingOccurrences(of: "3", with: "e")
                         .replacingOccurrences(of: "1", with: "i")
@@ -379,23 +380,30 @@ struct RegistrationController {
             }
     }
     
-    // Improved approach.  Two core functions:
-    // * handleRegisterRequest - Looks at the request and decides what to do with it
-    //   - Handle it ourselves
-    //   - Proxy it to the homeserver unchanged
-    //   - Proxy it to the homeserver with some modifications
-    // * handleRegisterResponse - Handle the response from the homeserver
-    //   - hmmm..  Not sure we really need a generic version of the response handler
-    //   - Different kinds of responses require different handlers
-    func handleRegisterRequest(req: Request) throws
+    func validateAgainstReservedWords(_ string: String, for req: Request)
+    -> EventLoopFuture<Bool>
+    {
+        let lower = string.lowercased()
+        
+        // FIXME Cache this
+        return ReservedWord.query(on: req.db)
+            .field(\.$word)
+            .all()
+            .map { (reservedWords) -> Bool in
+                for reservedWord in reservedWords {
+                    if lower == reservedWord.word.lowercased() {
+                        return false
+                    }
+                }
+                return true
+            }
+    }
+    
+    func handleRequestWithoutUiaa(req: Request)
     -> EventLoopFuture<Response>
     {
-        // First: Make sure this is a valid request
-        guard let apiVersion = req.parameters.get("version"),
-            apiVersions.contains(apiVersion) else {
-            return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "Invalid API version in request"))
-        }
-        
+        print("AURIC\t0. No UIAA session.  Running \"preflight\" checks on the registration request")
+
         // The Matrix CS API mandates that we do some early sanity checks on the requested account data
         /*
           Status code 400:
@@ -417,6 +425,8 @@ struct RegistrationController {
         //     Make them at least show us a token first.
         //     I don't want to answer this for the whole wide world.
         //   * So we should check for M_USER_IN_USE *after* validating the token
+        //     Note that this isn't totally outside of the Matrix spec -- It tells clients to expect that
+        //     the username might go from available to taken while they're doing auth.
         // The others seem genuinely useful though.
         // So, attempt to decode the registration request, and check for invalid and/or reserved usernames
         guard let registrationRequestData = try? req.content.decode(RegistrationRequestBody.self) else {
@@ -424,26 +434,68 @@ struct RegistrationController {
         }
         
         // Check for M_INVALID_USERNAME
-        guard validateUsername(username: registrationRequestData.username) else {
+        let username = registrationRequestData.username
+        let formatOk = validateUsernameFormat(username: username)
+        if !formatOk {
             let err = ResponseErrorContent(errcode: "M_INVALID_USERNAME", error: "The desired user ID is not a valid user name.")
             return err.encodeResponse(status: .badRequest, for: req)
+        } else {
+            // Check for M_EXCLUSIVE
+            // We're going to use this for all kinds of reserved things
+            return validateAgainstReservedWords(username, for: req).flatMap { usernameNotReserved in
+                let usernameIsReserved = !usernameNotReserved
+                if usernameIsReserved {
+                    // The username conflicts with a reserved name
+                    let err = ResponseErrorContent(errcode: "M_EXCLUSIVE", error: "The desired user ID is in the exclusive namespace claimed by an application service.")
+                    return err.encodeResponse(status: .badRequest, for: req)
+                } else {
+                    return validateAgainstBadlist(username, for: req).flatMap { usernameNotInBadlist in
+                        let usernameIsInBadlist = !usernameNotInBadlist
+                        if usernameIsInBadlist {
+                            // Usernames with naughty words in them are not valid
+                            let err = ResponseErrorContent(errcode: "M_INVALID_USERNAME", error: "The desired user ID is not a valid user name.")
+                            return err.encodeResponse(status: .badRequest, for: req)
+                        } else {
+                            // Hooray, we have a username that isn't known to be bad
+                            // Let's get this party started
+                            // Forward the request to the homeserver to start the UIAA session
+                            print("AURIC\t1. No UIAA session in request.  Proxying...")
+                            return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
+                                print("AURIC\t2. Got proxy response -- Status = \(hsResponse.status)")
+                                return handleUiaaResponse(res: hsResponse, for: req)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Improved approach.  Two core functions:
+    // * handleRegisterRequest - Looks at the request and decides what to do with it
+    //   - Handle it ourselves
+    //   - Proxy it to the homeserver unchanged
+    //   - Proxy it to the homeserver with some modifications
+    // * handleRegisterResponse - Handle the response from the homeserver
+    //   - hmmm..  Not sure we really need a generic version of the response handler
+    //   - Different kinds of responses require different handlers
+    func handleRegisterRequest(req: Request) throws
+    -> EventLoopFuture<Response>
+    {
+        // First: Make sure this is a valid request
+        guard let apiVersion = req.parameters.get("version"),
+            apiVersions.contains(apiVersion) else {
+            return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "Invalid API version in request"))
         }
         
-        // Check for M_EXCLUSIVE
-        // We're going to use this for all kinds of reserved things
-        
-        
+
         
         // What is this request?
         // 1. Before UIAA -- No 'auth' parameter, no UIAA session
         //   + Action: Pass it along to the homeserver
         //     We should expect the start of a UIAA session as the response
         guard req.hasUiaaSession else {
-            print("AURIC\t1. No UIAA session in request.  Proxying...")
-            return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
-                print("AURIC\t2. Got proxy response -- Status = \(hsResponse.status)")
-                return handleUiaaResponse(res: hsResponse, for: req)
-            }
+            return handleRequestWithoutUiaa(req: req)
         }
         
         // What is this request?
