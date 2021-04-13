@@ -428,7 +428,9 @@ struct RegistrationController {
         //     Note that this isn't totally outside of the Matrix spec -- It tells clients to expect that
         //     the username might go from available to taken while they're doing auth.
         // The others seem genuinely useful though.
-        // So, attempt to decode the registration request, and check for invalid and/or reserved usernames
+        // So, here we attempt to decode the registration request, and check for invalid and/or reserved usernames
+        
+        // Decode the Matrix registration request
         guard let registrationRequestData = try? req.content.decode(RegistrationRequestBody.self) else {
             return req.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Couldn't parse registration request"))
         }
@@ -449,6 +451,8 @@ struct RegistrationController {
                     let err = ResponseErrorContent(errcode: "M_EXCLUSIVE", error: "The desired user ID is in the exclusive namespace claimed by an application service.")
                     return err.encodeResponse(status: .badRequest, for: req)
                 } else {
+                    // One more check for invalid usernames -- the bad ones this time
+                    // This one is more expensive, so we do it last
                     return validateAgainstBadlist(username, for: req).flatMap { usernameNotInBadlist in
                         let usernameIsInBadlist = !usernameNotInBadlist
                         if usernameIsInBadlist {
@@ -457,6 +461,9 @@ struct RegistrationController {
                             return err.encodeResponse(status: .badRequest, for: req)
                         } else {
                             // Hooray, we have a username that isn't known to be bad
+                            
+                            // FIXME Add checks for bad password???
+                            
                             // Let's get this party started
                             // Forward the request to the homeserver to start the UIAA session
                             print("AURIC\t1. No UIAA session in request.  Proxying...")
@@ -470,6 +477,7 @@ struct RegistrationController {
             }
         }
     }
+    // ^^ Look at this freaking pyramid of doom we've got going here...
     
     // Improved approach.  Two core functions:
     // * handleRegisterRequest - Looks at the request and decides what to do with it
@@ -487,8 +495,6 @@ struct RegistrationController {
             apiVersions.contains(apiVersion) else {
             return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "Invalid API version in request"))
         }
-        
-
         
         // What is this request?
         // 1. Before UIAA -- No 'auth' parameter, no UIAA session
