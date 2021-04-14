@@ -17,14 +17,14 @@ public struct SynchronizedDictionary<Key, Value> where Key : Hashable {
     
     init() {
         self.dict = [:]
-        self.queue = DispatchQueue(label: "concurrent dict", qos: .default)
+        self.queue = DispatchQueue(label: "synchronized dict", qos: .default, attributes: .concurrent)
     }
     
     subscript(index: Key) -> Value? {
         get {
             var result: Value?
             self.queue.sync {
-                result = dict[index]
+            result = self.dict[index]
             }
             return result
         }
@@ -46,19 +46,22 @@ public struct SynchronizedDictionary<Key, Value> where Key : Hashable {
 public struct ConcurrentDictionary<Key, Value> where Key : Hashable {
     private var buckets: [SynchronizedDictionary<Key,Value>]
     
-    init(_ n: Int = 32) {
-        self.buckets = Array(repeating: SynchronizedDictionary<Key,Value>(), count: n)
+    init(_ n: Int = 1) {
+        self.buckets = []
+        for _ in 0 ..< n {
+            self.buckets.append( SynchronizedDictionary<Key,Value>() )
+        }
     }
     
     subscript(index: Key) -> Value? {
         get {
-            let bucket = buckets[abs(index.hashValue) % buckets.count]
-            return bucket[index]
+            let b = abs(index.hashValue) % buckets.count
+            return buckets[b][index]
         }
         
         set(newValue) {
-            var bucket = buckets[abs(index.hashValue) % buckets.count]
-            bucket[index] = newValue
+            let b = abs(index.hashValue) % buckets.count
+            buckets[b][index] = newValue
         }
     }
 

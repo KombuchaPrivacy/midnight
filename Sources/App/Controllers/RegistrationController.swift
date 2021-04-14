@@ -183,7 +183,7 @@ struct RegistrationController {
             }
     }
     
-    func handleUiaaRequest(req: Request, with data: UiaaRequestData) //throws
+    func handleUiaaRequest(req: Request, with data: RegistrationRequestBody) //throws
     -> EventLoopFuture<Response>
     {
         // Is this UIAA stage one of ours?
@@ -435,7 +435,14 @@ struct RegistrationController {
         
         // Decode the Matrix registration request
         guard let registrationRequestData = try? req.content.decode(RegistrationRequestBody.self) else {
-            return req.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Couldn't parse registration request"))
+            // Doesn't appear that we got any registration data.
+            // Probably the client is just probing to see what UIAA flows we support.
+            // Pass the request along to the homeserver
+            print("AURIC\t1. No registration data.  Sending this one to the homeserver.")
+            return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
+                print("AURIC\t2. Got proxy response -- Status = \(hsResponse.status)")
+                return handleUiaaResponse(res: hsResponse, for: req)
+            }
         }
         
         // Check for M_INVALID_USERNAME
@@ -469,9 +476,9 @@ struct RegistrationController {
                             
                             // Let's get this party started
                             // Forward the request to the homeserver to start the UIAA session
-                            print("AURIC\t1. No UIAA session in request.  Proxying...")
+                            print("AURIC\t3. No UIAA session in request, but it's a good, valid request.  Proxying it...")
                             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
-                                print("AURIC\t2. Got proxy response -- Status = \(hsResponse.status)")
+                                print("AURIC\t4. Got proxy response -- Status = \(hsResponse.status)")
                                 return handleUiaaResponse(res: hsResponse, for: req)
                             }
                         }
@@ -513,7 +520,7 @@ struct RegistrationController {
         //     - If so, handle the request and return our response without involving the homeserver
         //     - If not, remove any mention of our stages and pass the request along to the homeserver
         //     On the response, add back in the stages that we handle
-        if let requestData = try? req.content.decode(UiaaRequestData.self) {
+        if let requestData = try? req.content.decode(RegistrationRequestBody.self) {
             return handleUiaaRequest(req: req, with: requestData)
         }
         
@@ -572,120 +579,4 @@ struct RegistrationController {
         }
     }
     
-    // Initial attempt -- just throwing things together as I figure them out
-    func _old_handleRegister(req: Request) throws
-    -> EventLoopFuture<Response>
-    {
-        guard let apiVersion = req.parameters.get("version"),
-            apiVersions.contains(apiVersion) else {
-            throw Abort(HTTPStatus.badRequest)
-        }
-
-        
-        print("AURIC\tPOST /register\n\tData = \(req.body.string ?? "(no body)")")
-        
-        // Is this request for us to handle?
-        // Or should we proxy it on to the real homeserver?
-        //
-        // Try to decode the request body as a UIAA request JSON
-        //   - If it succeeds, look for type: social.kombucha.signup_token
-        //   - If the decoding fails, or the type doesn't match,
-        //     then just fall through and proxy the request
-        // Otherwise this request is not for us.
-        //   - Just pass it along to the homeserver.
-        do {
-            let reqContent = try req.content.decode(UiaaRequestData.self)
-            // If we're still here, then we should have a valid UIAA session
-            guard let sessionId = req.session.id?.string else {
-                return req.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "No session ID in request"))
-            }
-            if let token = reqContent.auth.token,
-               reqContent.auth.type == "social.kombucha.signup_token" {
-                // Hey cool, we got a token.
-                // Our job is to authenticate it as valid,
-                // and then return the proper response
-                return validateSignupToken(token, forRequest: req)
-                    .flatMap { numSlots in
-                        // The token is valid
-                        // Save it in the request's session
-                        req.session.data["token"] = token
-                        
-                        // Next we need to tell the client that their token auth was successful
-                        
-                        // FIXME Ah crud, there's a race condition here
-                        // How do we make sure that 1000 people can't all
-                        // register at the same time using the same token?
-                        // (Do we really care??)
-                        // If we care, then we need to find a way to gate this *before* we return success here
-                        // What if we added a new kind of "pending" registration state?
-                        // Then we preemptively add the anonymous user to our subscriptions table in a pending state, with a very short expiration time.  Like 10 or 15 minutes.
-                        // We can use their session ID to identify them in the pending entry in the table.
-                        // So now, when we validate a token, we have to check:
-                        // 1. Is it already full of registered users?
-                        // 2. If it's not already full, are there enough currently pending registrations to fill it up?
-                        // 3. If there is still room for one more pending registration, add this user to the pending list
-                        // (We should do 2 and 3 as a transaction)
-                        // ...
-                        // Then when the user finishes validating their email, SMS number, etc, and finally registers, then we can do another transaction to remove them from the pending table and add them to the subscription table
-                        
-                        return createPendingSubscription(for: req, given: numSlots).map {
-                            // Whew!
-                            // Now that we have our pending slot in the database, we can go ahead with the registration process
-                            // For now that means telling the client that their token-based auth was successful
-                            // ARGH - So what do we do if we've finished, and there are no other remaining auth stages?
-                            // FIXME Look this up in the Matrix API docs...
-                            var response = Response(status: .unauthorized)
-                            //return req.eventLoop.makeSucceededFuture(response)
-                            return response
-                        }
-                    }
-            }
-        } catch {
-            // Guess we failed to decode as a UIAA request...
-            // This one must not be for us.  We'll handle it below.
-        }
-        
-        // Proxy the request to the "real" homeserver to handle it
-        let homeserverURI = URI(scheme: .http,
-                                host: homeserver,
-                                port: homeserver_port,
-                                path: req.url.path)
-
-        return req.client.post(homeserverURI,
-                               headers: req.headers) { hsRequest in
-            hsRequest.body = req.body.data
-        }.flatMap { hsResponse in
-            
-            if let body = hsResponse.body {
-                let string = body.getString(at: 0, length: body.readableBytes)
-                print("AURIC\tGot response with body = \(string ?? "(none)")")
-            }
-            
-            do {
-                let hsResponseData = try hsResponse.content.decode(UiaaSessionState.self)
-                var responseData = hsResponseData
-
-                responseData.flows = []
-                for var flow in hsResponseData.flows {
-                    if flow.stages == ["m.login.dummy"] {
-                        flow.stages = ["social.kombucha.signup_token"]
-                    } else if !flow.stages.contains("social.kombucha.signup_token") {
-                        print("Inserting signup_token in auth flows")
-                        flow.stages.insert("social.kombucha.signup_token", at: 0)
-                        print("Stages = ", flow.stages)
-                    }
-                    print("Flow = ", flow)
-                    responseData.flows.append(flow)
-                }
-                print("Response data = ", responseData)
-                //return responseData
-            
-                return responseData.encodeResponse(status: .unauthorized, for: req)
-                //let response = Response(status: .ok, body: .init(string: "Hello world"))
-                //return response
-            } catch {
-                return req.eventLoop.makeFailedFuture(Abort(.internalServerError))
-            }
-        }
-    }
 }

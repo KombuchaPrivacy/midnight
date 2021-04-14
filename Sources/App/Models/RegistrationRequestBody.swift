@@ -8,11 +8,18 @@
 import Foundation
 import Vapor
 
-public struct RegistrationRequestBody: Content {
-    var auth: UiaaAuthData?
+public struct RegistrationUiaaAuthData: UiaaAuthData {
+    var session: String
+    var type = LOGIN_STAGE_SIGNUP_TOKEN
+    var token: String?
+}
+
+public struct RegistrationRequestBody: UiaaRequestData {
+    var auth: RegistrationUiaaAuthData // FIXME Make this configurable in the future
     var username: String
     var password: String
     var deviceId: String?
     var initialDeviceDisplayName: String?
     var inhibitLogin: Bool?
 }
+

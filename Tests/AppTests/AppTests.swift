@@ -16,39 +16,38 @@ final class AppTests: XCTestCase {
 
 final class AuricTests: XCTestCase {
 
-    func _register_second_request(_ app: Application, session: String) throws {
+    func _register_second_request(_ app: Application, state: UiaaSessionState) throws {
         try app.test(.POST,
                  "/_matrix/client/r0/register",
                  beforeRequest: { req in
-                    try req.content.encode(["auth": [
-                                                "session": session,
-                                                "username": "bob",
-                                                "password": "hunter2"
-                                            /*
-                                            ,
-                                            "auth": [
-                                                "type": "m.login.dummy"
-                                            ]
-                                            */
-                                                ]
-                                            ])
+                    let auth = RegistrationUiaaAuthData(
+                        session: state.session,
+                     type: LOGIN_STAGE_SIGNUP_TOKEN,
+                     token: "15c4-3db4-f03a-bf7a")
+                    let body = RegistrationRequestBody(auth: auth, username: "bob", password: "hunter2", deviceId: "ABCDEFG", initialDeviceDisplayName: "iPhone")
+                    try req.content.encode(body)
                  },
                  afterResponse: { res in
-                    let responseData = try res.content.decode(UiaaSessionState.self)
-                    XCTAssertEqual(session, responseData.session)
+                    XCTAssertEqual(res.status, .unauthorized)
+
                  }
                 )
     }
     
     func _register_first_request(_ app: Application) throws {
         try app.test(.POST,
-                 "/_matrix/client/r0/register",
-                 afterResponse: { res in
-                    XCTAssertEqual(res.status, .ok)
+                     "/_matrix/client/r0/register",
+                     beforeRequest: { req in
+                        let empty = "{}"
+                        try req.content.encode(empty)
+                     },
+                     afterResponse: { res in
+                        XCTAssertEqual(res.status, .unauthorized)
 
-                    let responseData = try res.content.decode(UiaaSessionState.self)
-                    XCTAssertNotNil(responseData)
-                    try _register_second_request(app, session: responseData.session)
+                        let state = try res.content.decode(UiaaSessionState.self)
+                        XCTAssertNotNil(state)
+                        print("TEST\tGot session = \(state.session)")
+                        try _register_second_request(app, state: state)
                  }
         )
     }

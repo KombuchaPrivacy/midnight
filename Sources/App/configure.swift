@@ -12,7 +12,8 @@ public func configure(_ app: Application) throws {
     app.migrations.add(CreateSubscriptions())
     app.migrations.add(CreateRegistrationData())
     
-    app.commands.use(CreateTokenCommand(), as: "create-token")
+    app.commands.use(CreateTokenCommand(), as: "create")
+    app.commands.use(ListTokensCommand(), as: "list")
     
     app.middleware.use(app.uiaaSessions.middleware)
 

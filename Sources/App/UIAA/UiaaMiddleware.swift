@@ -19,17 +19,15 @@ public final class UiaaMiddleware: Middleware {
     public func respond(to request: Request, chainingTo next: Responder) -> EventLoopFuture<Response> {
         
         // Now we look for the session ID in the request
-        if let uiaaReqData = try? request.content.decode(UiaaRequestData.self) {
+        if let uiaaReqData = try? request.content.decode(MinimalUiaaRequestData.self) {
             print("UIAA\tGot UIAA request data")
-            guard let sessionId = uiaaReqData.auth.session else {
-                return request.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "UIAA request has no session identifier"))
-            }
+            let sessionId = uiaaReqData.auth.session
             let id = SessionID(string: sessionId)
             return self.driver.readSession(id, for: request).flatMap { data in
                 guard let data = data else {
                     // First time we're seeing this one
                     // FIXME Shouldn't this be an error?  The first time we see a new session ID, it should be coming from the *homeserver*, not the client.  Hmmm...
-                    print("UIAA\tFound a new unexpected session")
+                    print("UIAA\tFound a new unexpected session: \(sessionId)")
                     return request.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Unknown session \(sessionId)"))
                 }
                 
@@ -51,7 +49,7 @@ public final class UiaaMiddleware: Middleware {
                 // Maybe we got a new session ID here in the response?
                 print("UIAA\tChecking for new session in response")
                 if let initialState = try? response.content.decode(UiaaSessionState.self) {
-                    print("UIAA\tFound new session in response")
+                    print("UIAA\tFound new session in response: \(initialState.session)")
                     var data = UiaaSessionData(initialData: [:], initialState: initialState)
                     data["session"] = initialState.session
                     

@@ -29,12 +29,18 @@ public struct UiaaSessionDriver {
     ) -> EventLoopFuture<SessionID> {
         let id = data.state.session
         let sessionID = SessionID(string: id)
+        print("DRIVER\tCreating session for id \(id)")
+
         self.store.dict[sessionID] = data
         return request.eventLoop.makeSucceededFuture(sessionID)
     }
     
     public func readSession(_ sessionID: SessionID, for request: Request) -> EventLoopFuture<UiaaSessionData?> {
+        print("DRIVER\tLooking up UIAA session \(sessionID.string)")
         let data = self.store.dict[sessionID]
+        if data == nil {
+            print("DRIVER\tWTF, we suck")
+        }
         return request.eventLoop.makeSucceededFuture(data)
     }
     

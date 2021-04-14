@@ -17,12 +17,12 @@ import Vapor
 //   * We might need a "bare" type for a concrete type that does nothing but the base protocol,
 //     like for the UiaaMiddleware that doesn't care about any of the higher-level functionality
 
-public struct UiaaAuthData: Content {
+protocol UiaaAuthData: Content {
     // NOTE: This structure might contain many other things that we don't know about
     // However, that's really not our problem here, as long as we can pass those along unmodified to the homeserver
-    var type: String
-    var session: String?
-    var token: String? //
+    var type: String { get }
+    var session: String { get }
+    //var token: String? //
 }
 
 // This type represents a generic Matrix API request that uses UIAA.
@@ -32,6 +32,16 @@ public struct UiaaAuthData: Content {
 // then need to decode the request body again, using a purpose-built type
 // for whatever kind of thing we're expecting, e.g. for registration or
 // changing password or whatever.
-public struct UiaaRequestData: Content {
-    var auth: UiaaAuthData
+protocol UiaaRequestData: Content {
+    associatedtype AUTH: UiaaAuthData
+    var auth: AUTH { get }
+}
+
+public struct MinimalUiaaAuthData: UiaaAuthData {
+    var type: String
+    var session: String
+}
+
+public struct MinimalUiaaRequestData: UiaaRequestData {
+    var auth: MinimalUiaaAuthData
 }
