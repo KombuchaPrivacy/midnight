@@ -9,6 +9,7 @@ import Foundation
 import Vapor
 import Fluent
 
+/*
 struct ReservedWordMigration: Migration {
     
     func prepare(on database: Database) -> EventLoopFuture<Void> {
@@ -25,3 +26,4 @@ struct ReservedWordMigration: Migration {
         database.schema("reservedwords").delete()
     }
 }
+*/

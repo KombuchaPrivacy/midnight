@@ -1,8 +1,8 @@
 //
-//  CreateSignupToken.swift
+//  PendingSubscriptionMigration.swift
 //  
 //
-//  Created by Macro Ramius on 4/2/21.
+//  Created by Macro Ramius on 4/13/21.
 //
 
 import Foundation
@@ -10,23 +10,20 @@ import Vapor
 import Fluent
 
 /*
-struct SignupTokenMigration: Migration {
+struct PendingSubscriptionMigration: Migration {
     
     func prepare(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("signuptokens")
+        database.schema("pending")
             .id()
             .field("token", .string)
-            .field("slots", .uint)
-            .field("access_level", .string)
-            .field("access_duration", .uint)
-            .field("created_by", .string)
+            .field("session_id", .string)
             .field("created_at", .datetime)
             .field("expires_at", .datetime)
             .create()
     }
     
     func revert(on database: Database) -> EventLoopFuture<Void> {
-        database.schema("signuptokens").delete()
+        database.schema("pending").delete()
     }
 }
 */
