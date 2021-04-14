@@ -54,9 +54,10 @@ struct RegistrationController {
                 guard let signupToken = maybeValidToken else {
                     return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "No such token"))
                 }
+                print("TOKEN\tFound a token: \(signupToken.token) -- Expires at \(signupToken.expiresAt)")
                 // Check whether the token is expired
                 // If there's no expiration date, then the token is always valid for now
-                guard signupToken.expiresAt ?? Date(timeIntervalSinceNow: 1000) < now else {
+                guard signupToken.expiresAt ?? Date(timeIntervalSinceNow: 1000) > now else {
                     return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "Token is expired"))
                 }
                 
@@ -81,11 +82,15 @@ struct RegistrationController {
     func createPendingSubscription(for req: Request, given numSlots: Int) //throws
     -> EventLoopFuture<Void>
     {
-        guard let token = req.session.data["token"],
-              let sessionId = req.session.id?.string else {
+        guard let session = req.uiaaSession else {
+            return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Error looking up session data"))
+        }
+        guard let token = session.data["token"],
+              let sessionId = session.id?.string else {
             return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Error looking up session data"))
         }
         
+        print("PENDING\tCreating a pending subscription")
         return req.db.transaction { database in
             // Add our current user to the list of pending registrations for our token
             let in30minutes = Date(timeIntervalSinceNow: 30 * 60)
@@ -99,9 +104,11 @@ struct RegistrationController {
                         .count()
                         .flatMap { count in
                             if count <= numSlots {
+                                print("PENDING\tSuccess!  There are still available slots.")
                                 return req.eventLoop.makeSucceededVoidFuture()
                             } else {
                                 // There are now too many pending registrations for our token
+                                print("PENDING\tFailure.  No remaining slots.  :(")
                                 // Fail the transaction, and maybe if there was a race and multiple clients failed, then one of us can try again later and succeed in the future
                                 return req.eventLoop.makeFailedFuture(Abort(.unauthorized, reason: "No slots available for the given token"))
                             }
@@ -192,11 +199,13 @@ struct RegistrationController {
         //   Maybe it knows what to do with this one.
         switch data.auth.type {
         case LOGIN_STAGE_SIGNUP_TOKEN:
+            print("TOKEN\tFound a token request")
             guard let token = data.auth.token else {
                 return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "No token provided"))
             }
             return handleSignupTokenRequest(req: req, token: token)
         default:
+            print("AURIC\tWe don't handle requests of type \(data.auth.type)")
             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
                 return handleUiaaResponse(res: hsResponse, for: req)
             }
@@ -521,6 +530,7 @@ struct RegistrationController {
         //     - If not, remove any mention of our stages and pass the request along to the homeserver
         //     On the response, add back in the stages that we handle
         if let requestData = try? req.content.decode(RegistrationRequestBody.self) {
+            print("AURIC\tHandling registration request with active session")
             return handleUiaaRequest(req: req, with: requestData)
         }
         

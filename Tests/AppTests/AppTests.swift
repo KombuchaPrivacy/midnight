@@ -23,13 +23,19 @@ final class AuricTests: XCTestCase {
                     let auth = RegistrationUiaaAuthData(
                         session: state.session,
                      type: LOGIN_STAGE_SIGNUP_TOKEN,
-                     token: "15c4-3db4-f03a-bf7a")
+                     token: "c308-ffda-12c5-5316")
                     let body = RegistrationRequestBody(auth: auth, username: "bob", password: "hunter2", deviceId: "ABCDEFG", initialDeviceDisplayName: "iPhone")
                     try req.content.encode(body)
                  },
                  afterResponse: { res in
                     XCTAssertEqual(res.status, .unauthorized)
 
+                    let newState = try res.content.decode(UiaaSessionState.self)
+                    XCTAssertNotNil(newState)
+                    
+                    print("TEST\tGot response:")
+                    print("TEST\t\tsession = \(newState.session)")
+                    print("TEST\t\tcompleted = \(newState.completed ?? [])")
                  }
                 )
     }
