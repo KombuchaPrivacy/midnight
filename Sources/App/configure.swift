@@ -8,6 +8,7 @@ public func configure(_ app: Application) throws {
     // uncomment to serve files from /Public folder
     // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     
+    // This is simpler now that we only have the two "Create..." Migrations to keep track of
     app.migrations.add(CreateSubscriptions())
     app.migrations.add(CreateRegistrationData())
     
