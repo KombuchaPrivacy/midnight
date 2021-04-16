@@ -33,6 +33,9 @@ public func configure(_ app: Application) throws {
                                      homeserver: "beta.kombucha.social",
                                      homeserver_scheme: .https,
                                      homeserver_port: 443,
+                                     //homeserver: "192.168.1.89",
+                                     //homeserver_scheme: .http,
+                                     //homeserver_port: 6167,
                                      apiVersions: ["r0", "v1"])
     
     // register routes

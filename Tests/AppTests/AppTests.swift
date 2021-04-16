@@ -18,7 +18,7 @@ final class AuricTests: XCTestCase {
 
     func _register_second_request(_ app: Application, state: UiaaSessionState) throws {
         try app.test(.POST,
-                 "/_matrix/client/r0/register",
+                 "/_matrix/client/r0/register?kind=user",
                  beforeRequest: { req in
                     let auth = RegistrationUiaaAuthData(
                         session: state.session,
@@ -42,7 +42,7 @@ final class AuricTests: XCTestCase {
     
     func _register_first_request(_ app: Application) throws {
         try app.test(.POST,
-                     "/_matrix/client/r0/register",
+                     "/_matrix/client/r0/register?kind=user",
                      beforeRequest: { req in
                         let empty = "{}"
                         try req.content.encode(empty)

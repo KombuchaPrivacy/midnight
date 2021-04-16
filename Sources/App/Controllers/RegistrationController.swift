@@ -163,7 +163,6 @@ struct RegistrationController {
                     // For now that means telling the client that their token-based auth was successful
                     
                     let flows = state.flows
-                    
                     let sessionId = state.session
                     
                     // Append this stage to the list of completed stages
@@ -173,24 +172,34 @@ struct RegistrationController {
                     // Whoops, we also need to save this into our session state struct
                     session.data.state.completed = completed
                     
+                    // Are we done?
+                    for flow in flows {
+                        if flow.isSatisfiedBy(completed: completed) {
+                            // We're done with the UIAA auth
+                            // Matrix spec says we should service the request now
+                            return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
+                                print("AURIC\tGot HS response for /register")
+                                print("\t\tStatus = \(hsResponse.status)")
+                                if hsResponse.status == .forbidden {
+                                    if let err = try? hsResponse.content.decode(ResponseErrorContent.self) {
+                                        print("\t\tError code: \(err.errcode)")
+                                        print("\t\tError: \(err.error)")
+                                    }
+                                }
+                                return proxyResponseToClientUnmodified(res: hsResponse, for: req)
+                            }
+                        }
+                    }
+                    // If we're still here, then we're not done
+                    // Send another 401 so the client can continue the UIAA process
+                    
                     // Copy the list of params (if any)
                     let params = state.params
-                    
                     let responseData = UiaaSessionState(flows: flows,
                                                         params: params,
                                                         completed: completed,
                                                         session: sessionId)
-                    
-                    // FIXME If this was the last stage, then we should
-                    // return 200 OK here
-                    var status: HTTPStatus = .unauthorized
-                    for flow in flows {
-                        if flow.isSatisfiedBy(completed: completed) {
-                            status = .ok
-                            break
-                        }
-                    }
-                    
+                    let status: HTTPStatus = .unauthorized
                     return responseData.encodeResponse(status: status, for: req)
                 }
             }
@@ -600,7 +609,7 @@ struct RegistrationController {
         // Proxy the request to the "real" homeserver to handle it
         let homeserverURI = URI(scheme: homeserver_scheme,
                                 host: homeserver,
-                                //port: homeserver_port,
+                                port: homeserver_port,
                                 path: req.url.path)
         print("AURIC\tProxying request to homeserver at \(homeserverURI)")
 
@@ -613,7 +622,26 @@ struct RegistrationController {
 
             // Copy the request body that we received into
             // our new request that we're sending to the HS
-            hsRequest.body = req.body.data
+            
+            // Check to see if we need to re-write the UIAA stage being attempted
+            // This only happens when one of the stages that we handle is the last one in the flow
+            // For everything else, just copy the client's request body into our proxy request
+            guard let body = try? req.content.decode(RegistrationRequestBody.self),
+                  body.auth.type == LOGIN_STAGE_SIGNUP_TOKEN else {
+                hsRequest.body = req.body.data
+                return
+            }
+            // If we're re-writing one of our stages, then we must be the only thing in the flow
+            // In this case, we should replace ourself with m.login.dummy because there must not
+            // have been any other requirements for UIAA auth here.
+            let proxyAuthData = RegistrationUiaaAuthData(session: body.auth.session, type: "m.login.dummy", token: nil)
+            let proxyRequestBody = RegistrationRequestBody(auth: proxyAuthData,
+                                                           username: body.username,
+                                                           password: body.password,
+                                                           deviceId: body.deviceId,
+                                                           initialDeviceDisplayName: body.initialDeviceDisplayName,
+                                                           inhibitLogin: body.inhibitLogin)
+            try hsRequest.content.encode(proxyRequestBody)
         }
     }
     

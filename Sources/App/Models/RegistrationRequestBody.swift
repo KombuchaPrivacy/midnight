@@ -10,7 +10,7 @@ import Vapor
 
 public struct RegistrationUiaaAuthData: UiaaAuthData {
     var session: String
-    var type = LOGIN_STAGE_SIGNUP_TOKEN
+    var type: String
     var token: String?
 }
 
