@@ -7,6 +7,7 @@ FROM swift:5.3-focal as build
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
     && apt-get -q update \
     && apt-get -q dist-upgrade -y \
+    && apt-get install -y libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up a build area
