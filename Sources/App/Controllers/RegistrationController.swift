@@ -19,6 +19,64 @@ struct RegistrationController {
     var homeserver_port: Int
     var apiVersions: [String]
     
+
+    
+    // MARK: Pending subscriptions
+    
+    func createPendingSubscription(for req: Request, given numSlots: Int) //throws
+    -> EventLoopFuture<Void>
+    {
+        guard let session = req.uiaaSession else {
+            return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Error looking up session data"))
+        }
+        guard let token = session.data["token"],
+              let sessionId = session.id?.string else {
+            return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Error looking up session data"))
+        }
+        
+        print("PENDING\tCreating a pending subscription")
+        return req.db.transaction { database in
+            // Add our current user to the list of pending registrations for our token
+            let in30minutes = Date(timeIntervalSinceNow: 30 * 60)
+            let pending = PendingSubscription(token: token, session: sessionId, expiration: in30minutes)
+            return pending.create(on: database)
+                .flatMap {
+                    let now = Date(timeIntervalSinceNow: 0.0)
+                    return PendingSubscription.query(on: database)
+                        .filter(\.$token == token)
+                        .filter(\.$expiresAt > now)
+                        .count()
+                        .flatMap { count in
+                            if count <= numSlots {
+                                print("PENDING\tSuccess!  There are still available slots.")
+                                return req.eventLoop.makeSucceededVoidFuture()
+                            } else {
+                                // There are now too many pending registrations for our token
+                                print("PENDING\tFailure.  No remaining slots.  :(")
+                                // Fail the transaction, and maybe if there was a race and multiple clients failed, then one of us can try again later and succeed in the future
+                                return req.eventLoop.makeFailedFuture(Abort(.unauthorized, reason: "No slots available for the given token"))
+                            }
+                        }
+                }
+        }
+    }
+    
+    func deletePendingSubscription(for req: Request) throws
+    -> EventLoopFuture<Void>
+    {
+        guard let token = req.session.data["token"],
+              let sessionId = req.session.id?.string else {
+            return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Error looking up session data"))
+        }
+        
+        return PendingSubscription.query(on: req.db)
+            .filter(\.$token == token)
+            .filter(\.$sessionId == sessionId)
+            .delete()
+    }
+    
+    // MARK: Signup Tokens
+    
     // Check the validity of the supplied token
     // Return the number of available registration slots for it
     func validateSignupToken(_ userToken: String, forRequest req: Request)
@@ -77,58 +135,6 @@ struct RegistrationController {
                     }
                 
             }
-    }
-    
-    func createPendingSubscription(for req: Request, given numSlots: Int) //throws
-    -> EventLoopFuture<Void>
-    {
-        guard let session = req.uiaaSession else {
-            return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Error looking up session data"))
-        }
-        guard let token = session.data["token"],
-              let sessionId = session.id?.string else {
-            return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Error looking up session data"))
-        }
-        
-        print("PENDING\tCreating a pending subscription")
-        return req.db.transaction { database in
-            // Add our current user to the list of pending registrations for our token
-            let in30minutes = Date(timeIntervalSinceNow: 30 * 60)
-            let pending = PendingSubscription(token: token, session: sessionId, expiration: in30minutes)
-            return pending.create(on: database)
-                .flatMap {
-                    let now = Date(timeIntervalSinceNow: 0.0)
-                    return PendingSubscription.query(on: database)
-                        .filter(\.$token == token)
-                        .filter(\.$expiresAt > now)
-                        .count()
-                        .flatMap { count in
-                            if count <= numSlots {
-                                print("PENDING\tSuccess!  There are still available slots.")
-                                return req.eventLoop.makeSucceededVoidFuture()
-                            } else {
-                                // There are now too many pending registrations for our token
-                                print("PENDING\tFailure.  No remaining slots.  :(")
-                                // Fail the transaction, and maybe if there was a race and multiple clients failed, then one of us can try again later and succeed in the future
-                                return req.eventLoop.makeFailedFuture(Abort(.unauthorized, reason: "No slots available for the given token"))
-                            }
-                        }
-                }
-        }
-    }
-    
-    func deletePendingSubscription(for req: Request) throws
-    -> EventLoopFuture<Void>
-    {
-        guard let token = req.session.data["token"],
-              let sessionId = req.session.id?.string else {
-            return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Error looking up session data"))
-        }
-        
-        return PendingSubscription.query(on: req.db)
-            .filter(\.$token == token)
-            .filter(\.$sessionId == sessionId)
-            .delete()
     }
     
     func handleSignupTokenRequest(req: Request, token: String)
@@ -190,6 +196,8 @@ struct RegistrationController {
             }
     }
     
+    // MARK: handle UIAA Request
+    
     func handleUiaaRequest(req: Request, with data: RegistrationRequestBody) //throws
     -> EventLoopFuture<Response>
     {
@@ -212,6 +220,7 @@ struct RegistrationController {
         }
     }
     
+    // MARK: proxyResponse..Unmodified
     func proxyResponseToClientUnmodified(res: ClientResponse, for req: Request)
     -> EventLoopFuture<Response>
     {
@@ -229,6 +238,7 @@ struct RegistrationController {
         return req.eventLoop.makeSucceededFuture(response)
     }
     
+    // MARK: handle UIAA Response
     func handleUiaaResponse(res: ClientResponse, for req: Request)
     -> EventLoopFuture<Response>
     {
@@ -264,6 +274,8 @@ struct RegistrationController {
         
         return ourResponseData.encodeResponse(status: .unauthorized, for: req)
     }
+    
+    // MARK: Username validation
     
     func validateUsernameFormat(username: String)
     -> Bool {
@@ -411,6 +423,8 @@ struct RegistrationController {
             }
     }
     
+    // MARK: Handle Request w/o UIAA
+    
     func handleRequestWithoutUiaa(req: Request)
     -> EventLoopFuture<Response>
     {
@@ -498,6 +512,8 @@ struct RegistrationController {
     }
     // ^^ Look at this freaking pyramid of doom we've got going here...
     
+    // MARK: Main handleRegisterRequest
+    
     // Improved approach.  Two core functions:
     // * handleRegisterRequest - Looks at the request and decides what to do with it
     //   - Handle it ourselves
@@ -547,6 +563,7 @@ struct RegistrationController {
         return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.notImplemented, reason: "FIXME We don't handle actual registration data yet"))
     }
 
+    // MARK: Handle /register Response
     // Handle the actual response from the Homeserver on the /register endpoint
     // Mostly we just pass the response along unmodified to the client
     func handleRegisterResponse(hsResponse: ClientResponse, for req: Request) //throws
@@ -566,6 +583,7 @@ struct RegistrationController {
         return req.eventLoop.makeSucceededFuture(response)
     }
     
+    // MARK: Proxy Req to Homeserver
     func proxyRequestToHomeserver(req: Request) //throws
     -> EventLoopFuture<ClientResponse>
     {
