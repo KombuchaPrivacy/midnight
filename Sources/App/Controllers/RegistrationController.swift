@@ -530,6 +530,16 @@ struct RegistrationController {
             apiVersions.contains(apiVersion) else {
             return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "Invalid API version in request"))
         }
+        guard let query = try? req.query.decode(RegistrationRequestQuery.self) else {
+            // FIXME What does Synapse do here?
+            //let err = ResponseErrorContent(errcode: "M_SOMETHING_SOMETHING, error: "Invalid account type")
+            return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "Invalid account type"))
+        }
+        guard query.kind == .user else {
+            // FIXME What does Synapse do here?
+            //let err = ResponseErrorContent(errcode: "M_SOMETHING_SOMETHING, error: "Invalid account type")
+            return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "The requested account type is not supported"))
+        }
         
         // What is this request?
         // 1. Before UIAA -- No 'auth' parameter, no UIAA session
