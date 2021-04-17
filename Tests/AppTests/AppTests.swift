@@ -23,7 +23,7 @@ final class AuricTests: XCTestCase {
                     let auth = RegistrationUiaaAuthData(
                         session: state.session,
                      type: LOGIN_STAGE_SIGNUP_TOKEN,
-                     token: "c308-ffda-12c5-5316")
+                     token: "3dbf-5ff3-e59c-e794")
                     let body = RegistrationRequestBody(auth: auth, username: "bob", password: "hunter2", deviceId: "ABCDEFG", initialDeviceDisplayName: "iPhone")
                     try req.content.encode(body)
                  },

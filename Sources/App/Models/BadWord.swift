@@ -12,6 +12,8 @@ import Fluent
 final class BadWord: Model {
     static let schema = "badwords"
     
+    static let badlist = "\u{41}"
+    
     @ID(key: .id)
     var id: UUID?
     

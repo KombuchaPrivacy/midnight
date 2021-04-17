@@ -14,6 +14,7 @@ public func configure(_ app: Application) throws {
     
     app.commands.use(CreateTokenCommand(), as: "create")
     app.commands.use(ListTokensCommand(), as: "list")
+    app.commands.use(BadWordCommand(), as: "badword")
     
     app.middleware.use(app.uiaaSessions.middleware)
 
