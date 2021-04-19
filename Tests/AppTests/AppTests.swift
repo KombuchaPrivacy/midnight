@@ -14,7 +14,7 @@ final class AppTests: XCTestCase {
     }
 }
 
-final class AuricTests: XCTestCase {
+final class ChuckieTests: XCTestCase {
 
     func _register_second_request(_ app: Application, state: UiaaSessionState) throws {
         try app.test(.POST,

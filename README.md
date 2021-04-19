@@ -1,4 +1,4 @@
-# Chuckie: Create and redeem tokens for Matrix accounts
+# 🐭 Chuckie: Create and redeem tokens for Matrix accounts
 
 Chuckie<sup>[1](#footnote1)</sup> adds more advanced membership management features to
 Matrix homeservers like [Synapse](https://github.com/matrix-org/synapse).

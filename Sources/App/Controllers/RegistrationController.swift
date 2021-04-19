@@ -178,7 +178,7 @@ struct RegistrationController {
                             // We're done with the UIAA auth
                             // Matrix spec says we should service the request now
                             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
-                                print("AURIC\tGot HS response for /register")
+                                print("CHUCKIE\tGot HS response for /register")
                                 print("\t\tStatus = \(hsResponse.status)")
                                 if hsResponse.status == .forbidden {
                                     if let err = try? hsResponse.content.decode(ResponseErrorContent.self) {
@@ -222,7 +222,7 @@ struct RegistrationController {
             }
             return handleSignupTokenRequest(req: req, token: token)
         default:
-            print("AURIC\tWe don't handle requests of type \(data.auth.type)")
+            print("CHUCKIE\tWe don't handle requests of type \(data.auth.type)")
             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
                 return handleUiaaResponse(res: hsResponse, for: req)
             }
@@ -251,12 +251,12 @@ struct RegistrationController {
     func handleUiaaResponse(res: ClientResponse, for req: Request)
     -> EventLoopFuture<Response>
     {
-        print("AURIC\tHandling UIAA Response")
+        print("CHUCKIE\tHandling UIAA Response")
         
         // The only response that we need to work with is a 401
         // Everything else we return unmodified
         guard res.status == HTTPStatus.unauthorized else {
-            print("AURIC\tUIAA response is not 401; Returning unmodified")
+            print("CHUCKIE\tUIAA response is not 401; Returning unmodified")
             // FIXME Make sure that 401's are all we need to touch
             //       Could there be 403's where we need to re-write the flows?
             return proxyResponseToClientUnmodified(res: res, for: req)
@@ -437,7 +437,7 @@ struct RegistrationController {
     func handleRequestWithoutUiaa(req: Request)
     -> EventLoopFuture<Response>
     {
-        print("AURIC\t0. No UIAA session.  Running \"preflight\" checks on the registration request")
+        print("CHUCKIE\t0. No UIAA session.  Running \"preflight\" checks on the registration request")
 
         // The Matrix CS API mandates that we do some early sanity checks on the requested account data
         /*
@@ -470,9 +470,9 @@ struct RegistrationController {
             // Doesn't appear that we got any registration data.
             // Probably the client is just probing to see what UIAA flows we support.
             // Pass the request along to the homeserver
-            print("AURIC\t1. No registration data.  Sending this one to the homeserver.")
+            print("CHUCKIE\t1. No registration data.  Sending this one to the homeserver.")
             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
-                print("AURIC\t2. Got proxy response -- Status = \(hsResponse.status)")
+                print("CHUCKIE\t2. Got proxy response -- Status = \(hsResponse.status)")
                 return handleUiaaResponse(res: hsResponse, for: req)
             }
         }
@@ -508,9 +508,9 @@ struct RegistrationController {
                             
                             // Let's get this party started
                             // Forward the request to the homeserver to start the UIAA session
-                            print("AURIC\t3. No UIAA session in request, but it's a good, valid request.  Proxying it...")
+                            print("CHUCKIE\t3. No UIAA session in request, but it's a good, valid request.  Proxying it...")
                             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
-                                print("AURIC\t4. Got proxy response -- Status = \(hsResponse.status)")
+                                print("CHUCKIE\t4. Got proxy response -- Status = \(hsResponse.status)")
                                 return handleUiaaResponse(res: hsResponse, for: req)
                             }
                         }
@@ -565,7 +565,7 @@ struct RegistrationController {
         //     - If not, remove any mention of our stages and pass the request along to the homeserver
         //     On the response, add back in the stages that we handle
         if let requestData = try? req.content.decode(RegistrationRequestBody.self) {
-            print("AURIC\tHandling registration request with active session")
+            print("CHUCKIE\tHandling registration request with active session")
             return handleUiaaRequest(req: req, with: requestData)
         }
         
@@ -611,12 +611,12 @@ struct RegistrationController {
                                 host: homeserver,
                                 port: homeserver_port,
                                 path: req.url.path)
-        print("AURIC\tProxying request to homeserver at \(homeserverURI)")
+        print("CHUCKIE\tProxying request to homeserver at \(homeserverURI)")
 
         return req.client.post(homeserverURI,
                                headers: req.headers) { hsRequest in
             // Patch up the headers to point to the homeserver instead of us
-            // This may not be necessary in deployment, when we're all behind the nginx proxy anyway, but it certainly helps during development where Auric is running on the local machine
+            // This may not be necessary in deployment, when we're all behind the nginx proxy anyway, but it certainly helps during development where Chuckie is running on the local machine
             hsRequest.headers.remove(name: "Host")
             hsRequest.headers.add(name: "Host", value: homeserver)
 
