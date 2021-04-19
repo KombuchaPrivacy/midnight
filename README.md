@@ -1,6 +1,6 @@
 # 🐭 Chuckie: Create and redeem tokens for Matrix accounts
 
-Chuckie<sup>[1](#footnote1)</sup> adds more advanced membership management features to
+Chuckie<sup>[1](#footnote1)</sup> aims to add more advanced membership management features to
 Matrix homeservers like [Synapse](https://github.com/matrix-org/synapse).
 
 It is written in the [Swift](https://www.swift.org/) programming language and
