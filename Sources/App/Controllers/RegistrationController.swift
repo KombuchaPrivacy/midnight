@@ -14,9 +14,12 @@ let LOGIN_STAGE_SIGNUP_TOKEN = "social.kombucha.login.signup_token"
 struct RegistrationController {
     var app: Application
     
+    /*
     var homeserver: String
     var homeserver_scheme: URI.Scheme = .https
     var homeserver_port: Int
+    */
+    var homeserver: URL
     var apiVersions: [String]
     
 
@@ -607,9 +610,9 @@ struct RegistrationController {
     -> EventLoopFuture<ClientResponse>
     {
         // Proxy the request to the "real" homeserver to handle it
-        let homeserverURI = URI(scheme: homeserver_scheme,
-                                host: homeserver,
-                                port: homeserver_port,
+        let homeserverURI = URI(scheme: homeserver.scheme,
+                                host: homeserver.host,
+                                port: homeserver.port,
                                 path: req.url.path)
         print("CHUCKIE\tProxying request to homeserver at \(homeserverURI)")
 
@@ -617,8 +620,10 @@ struct RegistrationController {
                                headers: req.headers) { hsRequest in
             // Patch up the headers to point to the homeserver instead of us
             // This may not be necessary in deployment, when we're all behind the nginx proxy anyway, but it certainly helps during development where Chuckie is running on the local machine
-            hsRequest.headers.remove(name: "Host")
-            hsRequest.headers.add(name: "Host", value: homeserver)
+            if let hsHost = homeserver.host {
+                hsRequest.headers.remove(name: "Host")
+                hsRequest.headers.add(name: "Host", value: hsHost)
+            }
 
             // Copy the request body that we received into
             // our new request that we're sending to the HS

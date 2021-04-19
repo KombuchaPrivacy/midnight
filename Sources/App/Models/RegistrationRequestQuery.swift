@@ -1,5 +1,5 @@
 //
-//  File.swift
+//  RegistrationRequestQuery.swift
 //  
 //
 //  Created by Macro Ramius on 4/16/21.

@@ -1,5 +1,5 @@
 import Fluent
-//import FluentPostgresDriver
+import FluentPostgresDriver
 import FluentSQLiteDriver
 import Vapor
 
@@ -17,26 +17,36 @@ public func configure(_ app: Application) throws {
     app.commands.use(BadWordCommand(), as: "badword")
     
     app.middleware.use(app.uiaaSessions.middleware)
-
-    /*
-    app.databases.use(.postgres(
-        hostname: Environment.get("DATABASE_HOST") ?? "localhost",
-        port: Environment.get("DATABASE_PORT").flatMap(Int.init(_:)) ?? PostgresConfiguration.ianaPortNumber,
-        username: Environment.get("DATABASE_USERNAME") ?? "vapor_username",
-        password: Environment.get("DATABASE_PASSWORD") ?? "vapor_password",
-        database: Environment.get("DATABASE_NAME") ?? "vapor_database"
-    ), as: .psql)
-    */
     
-    app.databases.use(.sqlite(.file("db.sqlite")), as: .sqlite)
-
+    // Load our configuration file
+    let configData = try Data(contentsOf: URL(fileURLWithPath: "chuckie.json"))
+    let decoder = JSONDecoder()
+    let config = try decoder.decode(Config.self, from: configData)
+    
+    if let dbc = config.database {
+        app.databases.use(.postgres(
+            hostname: dbc.host,
+            port: dbc.port ?? PostgresConfiguration.ianaPortNumber,
+            username: dbc.username,
+            password: dbc.password,
+            database: dbc.name
+        ), as: .psql)
+    } else {
+        app.databases.use(.sqlite(.file("db.sqlite")), as: .sqlite)
+    }
+    
     let reg = RegistrationController(app: app,
+                                     homeserver: config.homeserver,
+                                     /*
                                      homeserver: "beta.kombucha.social",
                                      homeserver_scheme: .https,
                                      homeserver_port: 443,
-                                     //homeserver: "192.168.1.89",
-                                     //homeserver_scheme: .http,
-                                     //homeserver_port: 6167,
+                                     */
+                                     /*
+                                     homeserver: "192.168.1.89",
+                                     homeserver_scheme: .http,
+                                     homeserver_port: 6167,
+                                     */
                                      apiVersions: ["r0", "v1"])
     
     // register routes
