@@ -19,7 +19,7 @@ public func configure(_ app: Application) throws {
     app.middleware.use(app.uiaaSessions.middleware)
     
     // Load our configuration file
-    let configData = try Data(contentsOf: URL(fileURLWithPath: "chuckie.json"))
+    let configData = try Data(contentsOf: URL(fileURLWithPath: "/matrix/chuckie/config/chuckie.json"))
     let decoder = JSONDecoder()
     let config = try decoder.decode(Config.self, from: configData)
     
@@ -32,7 +32,7 @@ public func configure(_ app: Application) throws {
             database: dbc.name
         ), as: .psql)
     } else {
-        app.databases.use(.sqlite(.file("db.sqlite")), as: .sqlite)
+        app.databases.use(.sqlite(.file("/matrix/chuckie/data/db.sqlite")), as: .sqlite)
     }
     
     let reg = RegistrationController(app: app,
