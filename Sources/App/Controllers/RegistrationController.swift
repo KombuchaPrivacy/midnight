@@ -37,7 +37,7 @@ struct RegistrationController {
             return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Error looking up session data"))
         }
         
-        print("PENDING\tCreating a pending subscription")
+        req.logger.debug("PENDING\tCreating a pending subscription")
         return req.db.transaction { database in
             // Add our current user to the list of pending registrations for our token
             let in30minutes = Date(timeIntervalSinceNow: 30 * 60)
@@ -51,11 +51,11 @@ struct RegistrationController {
                         .count()
                         .flatMap { count in
                             if count <= numSlots {
-                                print("PENDING\tSuccess!  There are still available slots.")
+                                req.logger.debug("PENDING\tSuccess!  There are still available slots.")
                                 return req.eventLoop.makeSucceededVoidFuture()
                             } else {
                                 // There are now too many pending registrations for our token
-                                print("PENDING\tFailure.  No remaining slots.  :(")
+                                req.logger.debug("PENDING\tFailure.  No remaining slots.  :(")
                                 // Fail the transaction, and maybe if there was a race and multiple clients failed, then one of us can try again later and succeed in the future
                                 return req.eventLoop.makeFailedFuture(Abort(.unauthorized, reason: "No slots available for the given token"))
                             }
@@ -115,7 +115,7 @@ struct RegistrationController {
                 guard let signupToken = maybeValidToken else {
                     return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "No such token"))
                 }
-                print("TOKEN\tFound a token: \(signupToken.token) -- Expires at \(signupToken.expiresAt)")
+                req.logger.debug("TOKEN\tFound a token: \(signupToken.token) -- Expires at \(signupToken.expiresAt)")
                 // Check whether the token is expired
                 // If there's no expiration date, then the token is always valid for now
                 guard signupToken.expiresAt ?? Date(timeIntervalSinceNow: 1000) > now else {
@@ -181,12 +181,12 @@ struct RegistrationController {
                             // We're done with the UIAA auth
                             // Matrix spec says we should service the request now
                             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
-                                print("CHUCKIE\tGot HS response for /register")
-                                print("\t\tStatus = \(hsResponse.status)")
+                                req.logger.debug("CHUCKIE\tGot HS response for /register")
+                                req.logger.debug("\t\tStatus = \(hsResponse.status)")
                                 if hsResponse.status == .forbidden {
                                     if let err = try? hsResponse.content.decode(ResponseErrorContent.self) {
-                                        print("\t\tError code: \(err.errcode)")
-                                        print("\t\tError: \(err.error)")
+                                        req.logger.debug("\t\tError code: \(err.errcode)")
+                                        req.logger.debug("\t\tError: \(err.error)")
                                     }
                                 }
                                 return proxyResponseToClientUnmodified(res: hsResponse, for: req)
@@ -219,7 +219,7 @@ struct RegistrationController {
         //   Maybe it knows what to do with this one.
         switch data.auth.type {
         case LOGIN_STAGE_SIGNUP_TOKEN:
-            print("TOKEN\tFound a token request")
+            req.logger.debug("TOKEN\tFound a token request")
             guard let token = data.auth.token else {
                 return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "No token provided"))
             }
@@ -255,7 +255,7 @@ struct RegistrationController {
             // it's not a good idea to be storing that in plain text.
             // Simple hashing is not great, but it's a lot better than keeping
             // a copy hanging around in plain text.  Maybe we could do a simple salt.
-            print("CHUCKIE\tWe don't handle requests of type \(data.auth.type)")
+            req.logger.debug("CHUCKIE\tWe don't handle requests of type \(data.auth.type)")
             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
                 return handleUiaaResponse(res: hsResponse, for: req)
             }
@@ -266,15 +266,15 @@ struct RegistrationController {
     func proxyResponseToClientUnmodified(res: ClientResponse, for req: Request)
     -> EventLoopFuture<Response>
     {
-        print("\t\(#function): Client response status = \(res.status)")
+        req.logger.debug("\t\(#function): Client response status = \(res.status)")
         let response: Response
         if let body = res.body {
-            print("\t\(#function): Got a response with content")
+            req.logger.debug("\t\(#function): Got a response with content")
             // FIXME This is where we need to insert our own UIAA stages
             // in the response before it goes back to the client
             response = Response(status: res.status, body: .init(buffer: body))
         } else {
-            print("\t\(#function): Got empty response")
+            req.logger.debug("\t\(#function): Got empty response")
             response = Response(status: res.status)
         }
         return req.eventLoop.makeSucceededFuture(response)
@@ -284,12 +284,12 @@ struct RegistrationController {
     func handleUiaaResponse(res: ClientResponse, for req: Request)
     -> EventLoopFuture<Response>
     {
-        print("CHUCKIE\tHandling UIAA Response")
+        req.logger.debug("CHUCKIE\tHandling UIAA Response")
         
         // The only response that we need to work with is a 401
         // Everything else we return unmodified
         guard res.status == HTTPStatus.unauthorized else {
-            print("CHUCKIE\tUIAA response is not 401; Returning unmodified")
+            req.logger.debug("CHUCKIE\tUIAA response is not 401; Returning unmodified")
             // FIXME Make sure that 401's are all we need to touch
             //       Could there be 403's where we need to re-write the flows?
             return proxyResponseToClientUnmodified(res: res, for: req)
@@ -305,14 +305,14 @@ struct RegistrationController {
             if flow.stages == ["m.login.dummy"] {
                 flow.stages = [LOGIN_STAGE_SIGNUP_TOKEN]
             } else if !flow.stages.contains(LOGIN_STAGE_SIGNUP_TOKEN) {
-                print("Inserting signup_token in auth flows")
+                req.logger.debug("Inserting signup_token in auth flows")
                 flow.stages.insert(LOGIN_STAGE_SIGNUP_TOKEN, at: 0)
-                print("Stages = ", flow.stages)
+                req.logger.debug("Stages = \(flow.stages)")
             }
-            print("Flow = ", flow)
+            req.logger.debug("Flow = \(flow)")
             ourResponseData.flows.append(flow)
         }
-        print("\t\(#function): Returning response data = \(ourResponseData)")
+        req.logger.debug("\t\(#function): Returning response data = \(ourResponseData)")
         
         return ourResponseData.encodeResponse(status: .unauthorized, for: req)
     }
@@ -470,7 +470,7 @@ struct RegistrationController {
     func handleRequestWithoutUiaa(req: Request)
     -> EventLoopFuture<Response>
     {
-        print("CHUCKIE\t0. No UIAA session.  Running \"preflight\" checks on the registration request")
+        req.logger.debug("CHUCKIE\t0. No UIAA session.  Running \"preflight\" checks on the registration request")
 
         // The Matrix CS API mandates that we do some early sanity checks on the requested account data
         /*
@@ -503,9 +503,9 @@ struct RegistrationController {
             // Doesn't appear that we got any registration data.
             // Probably the client is just probing to see what UIAA flows we support.
             // Pass the request along to the homeserver
-            print("CHUCKIE\t1. No registration data.  Sending this one to the homeserver.")
+            req.logger.debug("CHUCKIE\t1. No registration data.  Sending this one to the homeserver.")
             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
-                print("CHUCKIE\t2. Got proxy response -- Status = \(hsResponse.status)")
+                req.logger.debug("CHUCKIE\t2. Got proxy response -- Status = \(hsResponse.status)")
                 return handleUiaaResponse(res: hsResponse, for: req)
             }
         }
@@ -541,9 +541,9 @@ struct RegistrationController {
                             
                             // Let's get this party started
                             // Forward the request to the homeserver to start the UIAA session
-                            print("CHUCKIE\t3. No UIAA session in request, but it's a good, valid request.  Proxying it...")
+                            req.logger.debug("CHUCKIE\t3. No UIAA session in request, but it's a good, valid request.  Proxying it...")
                             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
-                                print("CHUCKIE\t4. Got proxy response -- Status = \(hsResponse.status)")
+                                req.logger.debug("CHUCKIE\t4. Got proxy response -- Status = \(hsResponse.status)")
                                 return handleUiaaResponse(res: hsResponse, for: req)
                             }
                         }
@@ -598,7 +598,7 @@ struct RegistrationController {
         //     - If not, remove any mention of our stages and pass the request along to the homeserver
         //     On the response, add back in the stages that we handle
         if let requestData = try? req.content.decode(RegistrationRequestBody.self) {
-            print("CHUCKIE\tHandling registration request with active session")
+            req.logger.debug("CHUCKIE\tHandling registration request with active session")
             return handleUiaaRequest(req: req, with: requestData)
         }
         
@@ -644,7 +644,7 @@ struct RegistrationController {
                                 host: homeserver.host,
                                 port: homeserver.port,
                                 path: req.url.path)
-        print("CHUCKIE\tProxying request to homeserver at \(homeserverURI)")
+        req.logger.debug("CHUCKIE\tProxying request to homeserver at \(homeserverURI)")
 
         return req.client.post(homeserverURI,
                                headers: req.headers) { hsRequest in

@@ -5,6 +5,7 @@ import Vapor
 
 // configures your application
 public func configure(_ app: Application) throws {
+    app.logger.info("Configuring application")
     // uncomment to serve files from /Public folder
     // app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
     
@@ -16,14 +17,26 @@ public func configure(_ app: Application) throws {
     app.commands.use(ListTokensCommand(), as: "list")
     app.commands.use(BadWordCommand(), as: "badword")
     
+    app.logger.info("Setting up UIAA middleware")
     app.middleware.use(app.uiaaSessions.middleware)
     
     // Load our configuration file
-    let configData = try Data(contentsOf: URL(fileURLWithPath: "/matrix/chuckie/config/chuckie.json"))
+    app.logger.info("Loading configuration file")
     let decoder = JSONDecoder()
+    
+    func getConfigData() throws -> Data {
+        guard let localConfigData = try? Data(contentsOf: URL(fileURLWithPath: "chuckie.json")) else {
+            let globalConfigData = try Data(contentsOf: URL(fileURLWithPath: "/matrix/chuckie/config/chuckie.json"))
+            return globalConfigData
+        }
+        return localConfigData
+    }
+    
+    let configData = try getConfigData()
     let config = try decoder.decode(Config.self, from: configData)
     
     if let dbc = config.database {
+        app.logger.info("Using Postgres database")
         app.databases.use(.postgres(
             hostname: dbc.host,
             port: dbc.port ?? PostgresConfiguration.ianaPortNumber,
@@ -32,9 +45,11 @@ public func configure(_ app: Application) throws {
             database: dbc.name
         ), as: .psql)
     } else {
+        app.logger.info("Using SQLite database")
         app.databases.use(.sqlite(.file("/matrix/chuckie/data/db.sqlite")), as: .sqlite)
     }
     
+    app.logger.info("Setting up the registration controller")
     let reg = RegistrationController(app: app,
                                      homeserver: config.homeserver,
                                      /*
@@ -50,5 +65,6 @@ public func configure(_ app: Application) throws {
                                      apiVersions: ["r0", "v1"])
     
     // register routes
+    app.logger.info("Registering routes")
     try routes(app, reg: reg)
 }
