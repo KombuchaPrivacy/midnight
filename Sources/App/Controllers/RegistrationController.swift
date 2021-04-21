@@ -225,6 +225,36 @@ struct RegistrationController {
             }
             return handleSignupTokenRequest(req: req, token: token)
         default:
+            // FIXME There's a possible TOCTTOU vulnerability lurking here
+            // We've already validated the username when the first request
+            // came in without a UIAA session.
+            // BUT What's to say that the client didn't change things up and
+            // submit a *different* username for this request?
+            // If we just stupidly pass the request along to the homeserver here,
+            // then the client could sneak one by us.  Like this:
+            // Request 1:
+            //   * No UIAA session
+            //   * Username: something innocuous that doesn't trip our filters, e.g. "abcdefgh"
+            // Request 2:
+            //   * UIAA session from homeserver
+            //   * Type: signup_token
+            //   * Token: some valid token
+            //   * Username: same as in request 1, e.g. "abcdefgh"
+            // Request 3:
+            //   * UIAA session from homeserver
+            //   * Type: some type that we don't handle
+            //   * Username: something offensive that would have tripped our filters on Request 1
+            // ARGH
+            // So we need to do two things:
+            // 1. When we first create the UIAA session, store the requested
+            //    username in the UIAA session state data.
+            // 2. When we get to this point of handing off requests to the
+            //    homeserver, check that the username hasn't been changed.
+            //    Otherwise, return a 403.
+            // We should probably do something similar with the password, but
+            // it's not a good idea to be storing that in plain text.
+            // Simple hashing is not great, but it's a lot better than keeping
+            // a copy hanging around in plain text.  Maybe we could do a simple salt.
             print("CHUCKIE\tWe don't handle requests of type \(data.auth.type)")
             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
                 return handleUiaaResponse(res: hsResponse, for: req)
