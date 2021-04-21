@@ -577,7 +577,7 @@ struct RegistrationController {
             //let err = ResponseErrorContent(errcode: "M_SOMETHING_SOMETHING, error: "Invalid account type")
             return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "Invalid account type"))
         }
-        guard query.kind == .user else {
+        guard query.kind != .guest else {
             // FIXME What does Synapse do here?
             //let err = ResponseErrorContent(errcode: "M_SOMETHING_SOMETHING, error: "Invalid account type")
             return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "The requested account type is not supported"))
