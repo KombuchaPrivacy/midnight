@@ -100,6 +100,8 @@ struct RegistrationController {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         guard SignupToken.validateFormat(token: token) else {
+            // FIXME We're going to have to create our own Abort/Error type
+            // that includes Matrix-style JSON data in the response... argh.
             return req.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Invalid token"))
         }
         
@@ -114,12 +116,16 @@ struct RegistrationController {
             .flatMap { maybeValidToken in
                 guard let signupToken = maybeValidToken else {
                     return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "No such token"))
+                    //let err = ResponseErrorContent(errcode: "TOKEN_DOESNT_EXIST", error: "No such token")
+                    //return err.encodeResponse(status: .forbidden, for: req)
                 }
                 req.logger.debug("TOKEN\tFound a token: \(signupToken.token) -- Expires at \(signupToken.expiresAt)")
                 // Check whether the token is expired
                 // If there's no expiration date, then the token is always valid for now
                 guard signupToken.expiresAt ?? Date(timeIntervalSinceNow: 1000) > now else {
                     return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "Token is expired"))
+                    //let err = ResponseErrorContent(errcode: "TOKEN_EXPIRED", error: "Token is expired")
+                    //return err.encodeResponse(status: .forbidden, for: req)
                 }
                 
                 // So far so good.  We have a valid token.
@@ -133,6 +139,8 @@ struct RegistrationController {
                         let available = Int(signupToken.slots) - count
                         guard available > 0 else {
                             return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "No more signups allowed with this token"))
+                            //let err = ResponseErrorContent(errcode: "TOKEN_EXHAUSTED", error: "No more signups allowed with this token")
+                            //return err.encodeResponse(status: .forbidden, for: req)
                         }
                         return req.eventLoop.makeSucceededFuture(available)
                     }
@@ -148,7 +156,9 @@ struct RegistrationController {
                 // The token is valid
                 // Save it in the request's session
                 guard let session = req.uiaaSession else {
-                    return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Couldn't find authentication session"))
+                    //return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Couldn't find authentication session"))
+                    let err = ResponseErrorContent(errcode: "M_INVALID_SESSION", error: "No valid session")
+                    return err.encodeResponse(status: .internalServerError, for: req)
                 }
                 
                 var state = session.data.state
@@ -221,7 +231,9 @@ struct RegistrationController {
         case LOGIN_STAGE_SIGNUP_TOKEN:
             req.logger.debug("TOKEN\tFound a token request")
             guard let token = data.auth.token else {
-                return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "No token provided"))
+                //return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "No token provided"))
+                let err = ResponseErrorContent(errcode: "TOKEN_MISSING", error: "No token provided")
+                return err.encodeResponse(status: .badRequest, for: req)
             }
             return handleSignupTokenRequest(req: req, token: token)
         default:
