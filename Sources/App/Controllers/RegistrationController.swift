@@ -612,7 +612,11 @@ struct RegistrationController {
         //       and add the new user to our table of current subscriptions
         // FIXME TODO
         
-        return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.notImplemented, reason: "FIXME We don't handle actual registration data yet"))
+        //return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.notImplemented, reason: "FIXME We don't handle actual registration data yet"))
+        // Actually we shouldn't be here at all.
+        // We should go directly from UIAA -> homeserver -> actual /register request processing after the final stage is complete
+        let err = ResponseErrorContent(errcode: "M_BAD_REQUEST", error: "Couldn't parse /register request")
+        return err.encodeResponse(status: .badRequest, for: req)
     }
 
     // MARK: Handle /register Response
