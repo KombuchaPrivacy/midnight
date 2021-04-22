@@ -615,6 +615,10 @@ struct RegistrationController {
         //return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.notImplemented, reason: "FIXME We don't handle actual registration data yet"))
         // Actually we shouldn't be here at all.
         // We should go directly from UIAA -> homeserver -> actual /register request processing after the final stage is complete
+        // So if we're here, then something went wrong.
+        if let requestBody = req.body.string {
+            req.logger.info("Got a bad request that we couldn't parse: \(requestBody)")
+        }
         let err = ResponseErrorContent(errcode: "M_BAD_REQUEST", error: "Couldn't parse /register request")
         return err.encodeResponse(status: .badRequest, for: req)
     }
