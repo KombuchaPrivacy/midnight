@@ -18,6 +18,11 @@ public final class UiaaMiddleware: Middleware {
     
     public func respond(to request: Request, chainingTo next: Responder) -> EventLoopFuture<Response> {
         
+        let headers = request.headers
+        for h in headers {
+            request.logger.debug("Got header: \(h.name) = \(h.value)")
+        }
+        
         // Now we look for the session ID in the request
         if let uiaaReqData = try? request.content.decode(MinimalUiaaRequestData.self) {
             request.logger.debug("UIAA\tGot UIAA request data")
