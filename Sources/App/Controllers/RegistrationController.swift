@@ -583,6 +583,10 @@ struct RegistrationController {
             return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "The requested account type is not supported"))
         }
         
+        if let stringBody = req.body.string {
+            req.logger.debug("Got request with body [\(stringBody)]")
+        }
+        
         // What is this request?
         // 1. Before UIAA -- No 'auth' parameter, no UIAA session
         //   + Action: Pass it along to the homeserver
