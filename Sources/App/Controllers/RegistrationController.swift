@@ -510,6 +510,16 @@ struct RegistrationController {
             }
         }
         
+        // Update 2021-04-22 Does this really make sense here?  No.
+        // The client hasn't even provided a token yet, so we have no idea
+        // whether they actuallly belong here, or if they're just wasting
+        // our time / gathering intel on us.
+        // PLUS, due to the weird way the UIAA auth works, we don't yet know
+        // what username the client will provide when it's finally time to
+        // handle the registration request.  Why are we bothering with this for now?
+        // We *can* make this work, by saving the username and the result of our
+        // checking in the UiaaSession state.  But why bother?
+        /*
         // Check for M_INVALID_USERNAME
         let username = registrationRequestData.username
         let formatOk = validateUsernameFormat(username: username)
@@ -538,7 +548,7 @@ struct RegistrationController {
                             // Hooray, we have a username that isn't known to be bad
                             
                             // FIXME Add checks for bad password???
-                            
+        */
                             // Let's get this party started
                             // Forward the request to the homeserver to start the UIAA session
                             req.logger.debug("CHUCKIE\t3. No UIAA session in request, but it's a good, valid request.  Proxying it...")
@@ -546,11 +556,13 @@ struct RegistrationController {
                                 req.logger.debug("CHUCKIE\t4. Got proxy response -- Status = \(hsResponse.status)")
                                 return handleUiaaResponse(res: hsResponse, for: req)
                             }
+        /*
                         }
                     }
                 }
             }
         }
+        */
     }
     // ^^ Look at this freaking pyramid of doom we've got going here...
     

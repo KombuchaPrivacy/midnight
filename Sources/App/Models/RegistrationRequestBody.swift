@@ -16,8 +16,8 @@ public struct RegistrationUiaaAuthData: UiaaAuthData {
 
 public struct RegistrationRequestBody: UiaaRequestData {
     var auth: RegistrationUiaaAuthData // FIXME Make this configurable in the future
-    var username: String
-    var password: String
+    var username: String?
+    var password: String?
     var deviceId: String?
     var initialDeviceDisplayName: String?
     var inhibitLogin: Bool?
