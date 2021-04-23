@@ -50,6 +50,10 @@ public final class UiaaMiddleware: Middleware {
                 request.logger.debug("UIAA\tChecking for new session in response")
                 if let initialState = try? response.content.decode(UiaaSessionState.self) {
                     request.logger.debug("UIAA\tFound new session in response: \(initialState.session)")
+                    request.logger.debug("UIAA\tFlows = ")
+                    for flow in initialState.flows {
+                        request.logger.debug("UIAA\t\t\(flow.stages)")
+                    }
                     var data = UiaaSessionData(initialData: [:], initialState: initialState)
                     data["session"] = initialState.session
                     
