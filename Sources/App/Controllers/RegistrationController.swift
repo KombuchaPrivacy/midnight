@@ -102,7 +102,7 @@ struct RegistrationController {
         guard SignupToken.validateFormat(token: token) else {
             // FIXME We're going to have to create our own Abort/Error type
             // that includes Matrix-style JSON data in the response... argh.
-            return req.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Invalid token"))
+            return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "Invalid token"))
         }
         
         // Once we've got a token that's of the proper form,
@@ -184,10 +184,12 @@ struct RegistrationController {
                     state.completed = completed
                     // Whoops, we also need to save this into our session state struct
                     session.data.state.completed = completed
+                    req.logger.debug("CHUCKIE\tCompleted = \(completed)")
                     
                     // Are we done?
                     for flow in flows {
                         if flow.isSatisfiedBy(completed: completed) {
+                            req.logger.debug("CHUCKIE\tUIAA Auth is satisfied with auth flow: [\(flow.stages)]")
                             // We're done with the UIAA auth
                             // Matrix spec says we should service the request now
                             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
@@ -204,6 +206,7 @@ struct RegistrationController {
                         }
                     }
                     // If we're still here, then we're not done
+                    req.logger.debug("CHUCKIE\tMaking progress through UIAA auth.  Sending 401 to proceed.")
                     // Send another 401 so the client can continue the UIAA process
                     
                     // Copy the list of params (if any)
