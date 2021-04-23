@@ -323,9 +323,25 @@ struct RegistrationController {
         ourResponseData.flows = []
         for var flow in hsResponseData.flows {
             req.logger.debug("CHUCKIE\tOld flow = \(flow.stages)")
+            // New idea: Keep the m.login.dummy stage hanging around.
+            // This lets us return a response to the client after the token stage,
+            // regardless of whether there are more "real" stages or not.
+            // Then, the client can show a new UI element to get the user's
+            // desired username and password before submitting the next request.
+            // Otherwise, we'd have to ask for username and password before
+            // validating the token, and that would be weird.
+            // 1) It's jerky to act like we can create an account for them
+            //    if/when the token is invalid or already expired etc
+            // 2) The other role for the signup token is to act as a stand-in
+            //    for an Apple (or one day, Google) subscription for paid services.
+            //    For a subscription service, there's no point in asking for
+            //    someone's username/password if they haven't already paid.
+            /*
             if flow.stages == ["m.login.dummy"] {
                 flow.stages = [LOGIN_STAGE_SIGNUP_TOKEN]
-            } else if !flow.stages.contains(LOGIN_STAGE_SIGNUP_TOKEN) {
+            } else
+            */
+            if !flow.stages.contains(LOGIN_STAGE_SIGNUP_TOKEN) {
                 req.logger.debug("CHUCKIE\tInserting signup_token in auth flows")
                 flow.stages.insert(LOGIN_STAGE_SIGNUP_TOKEN, at: 0)
                 req.logger.debug("CHUCKIE\tStages = \(flow.stages)")
