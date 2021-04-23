@@ -322,6 +322,7 @@ struct RegistrationController {
         var ourResponseData = hsResponseData
         ourResponseData.flows = []
         for var flow in hsResponseData.flows {
+            req.logger.debug("CHUCKIE\tOld flow = \(flow.stages)")
             if flow.stages == ["m.login.dummy"] {
                 flow.stages = [LOGIN_STAGE_SIGNUP_TOKEN]
             } else if !flow.stages.contains(LOGIN_STAGE_SIGNUP_TOKEN) {
@@ -329,10 +330,10 @@ struct RegistrationController {
                 flow.stages.insert(LOGIN_STAGE_SIGNUP_TOKEN, at: 0)
                 req.logger.debug("CHUCKIE\tStages = \(flow.stages)")
             }
-            req.logger.debug("CHUCKIE\tFlow = \(flow)")
+            req.logger.debug("CHUCKIE\tNew flow = \(flow.stages)")
             ourResponseData.flows.append(flow)
         }
-        req.logger.debug("CHUCKIE\t\(#function): Returning response data = \(ourResponseData)")
+        //req.logger.debug("CHUCKIE\t\(#function): Returning response data = \(ourResponseData)")
         
         return ourResponseData.encodeResponse(status: .unauthorized, for: req)
     }
