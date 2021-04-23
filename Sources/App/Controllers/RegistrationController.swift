@@ -185,6 +185,10 @@ struct RegistrationController {
                     // Whoops, we also need to save this into our session state struct
                     session.data.state.completed = completed
                     req.logger.debug("CHUCKIE\tCompleted = \(completed)")
+                    req.logger.debug("CHUCKIE\tFlows =")
+                    for flow in flows {
+                        req.logger.debug("CHUCKIE\t\t\(flow.stages)")
+                    }
                     
                     // Are we done?
                     for flow in flows {
