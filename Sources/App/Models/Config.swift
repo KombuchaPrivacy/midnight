@@ -19,5 +19,6 @@ public struct Config: Codable {
     }
     
     var homeserver: URL
-    var database: DBConfig?
+    var databaseServer: DBConfig?
+    var databaseFile: String?
 }

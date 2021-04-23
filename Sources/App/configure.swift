@@ -35,18 +35,23 @@ public func configure(_ app: Application) throws {
     let configData = try getConfigData()
     let config = try decoder.decode(Config.self, from: configData)
     
-    if let dbc = config.database {
+    if let dbs = config.databaseServer {
         app.logger.info("Using Postgres database")
         app.databases.use(.postgres(
-            hostname: dbc.host,
-            port: dbc.port ?? PostgresConfiguration.ianaPortNumber,
-            username: dbc.username,
-            password: dbc.password,
-            database: dbc.name
+            hostname: dbs.host,
+            port: dbs.port ?? PostgresConfiguration.ianaPortNumber,
+            username: dbs.username,
+            password: dbs.password,
+            database: dbs.name
         ), as: .psql)
     } else {
         app.logger.info("Using SQLite database")
-        app.databases.use(.sqlite(.file("/matrix/chuckie/data/db.sqlite")), as: .sqlite)
+        if let dbFilename = config.databaseFile {
+            app.databases.use(.sqlite(.file(dbFilename)), as: .sqlite)
+        }
+        else {
+            app.databases.use(.sqlite(.file("chuckie.sqlite")), as: .sqlite)
+        }
     }
     
     app.logger.info("Setting up the registration controller")
