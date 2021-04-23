@@ -318,20 +318,21 @@ struct RegistrationController {
             return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Couldn't parse Matrix data"))
         }
         
+        req.logger.debug("CHUCKIE\tRe-writing UIAA flows from the homeserver")
         var ourResponseData = hsResponseData
         ourResponseData.flows = []
         for var flow in hsResponseData.flows {
             if flow.stages == ["m.login.dummy"] {
                 flow.stages = [LOGIN_STAGE_SIGNUP_TOKEN]
             } else if !flow.stages.contains(LOGIN_STAGE_SIGNUP_TOKEN) {
-                req.logger.debug("Inserting signup_token in auth flows")
+                req.logger.debug("CHUCKIE\tInserting signup_token in auth flows")
                 flow.stages.insert(LOGIN_STAGE_SIGNUP_TOKEN, at: 0)
-                req.logger.debug("Stages = \(flow.stages)")
+                req.logger.debug("CHUCKIE\tStages = \(flow.stages)")
             }
-            req.logger.debug("Flow = \(flow)")
+            req.logger.debug("CHUCKIE\tFlow = \(flow)")
             ourResponseData.flows.append(flow)
         }
-        req.logger.debug("\t\(#function): Returning response data = \(ourResponseData)")
+        req.logger.debug("CHUCKIE\t\(#function): Returning response data = \(ourResponseData)")
         
         return ourResponseData.encodeResponse(status: .unauthorized, for: req)
     }
