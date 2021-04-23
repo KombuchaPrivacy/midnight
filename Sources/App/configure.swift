@@ -23,6 +23,7 @@ public func configure(_ app: Application) throws {
     // Load our configuration file
     app.logger.info("Loading configuration file")
     let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
     
     func getConfigData() throws -> Data {
         guard let localConfigData = try? Data(contentsOf: URL(fileURLWithPath: "chuckie.json")) else {
