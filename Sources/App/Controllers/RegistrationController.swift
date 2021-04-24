@@ -315,10 +315,9 @@ struct RegistrationController {
         }
         
         guard let hsResponseData = try? res.content.decode(UiaaSessionState.self) else {
-            if let string = try? res.content.decode(String.self) {
-                req.logger.warning("Failed to decode UIAA response: [\(string)]")
-            }
-            return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Couldn't parse Matrix data"))
+            //return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Couldn't parse Matrix data"))
+            let err = ResponseErrorContent(errcode: "M_WTF_JUST_HAPPENED", error: "Couldn't parse Matrix data from homeserver")
+            return err.encodeResponse(for: req)
         }
         
         req.logger.debug("CHUCKIE\tRe-writing UIAA flows from the homeserver")
