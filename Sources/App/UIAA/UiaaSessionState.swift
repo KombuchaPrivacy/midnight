@@ -45,7 +45,7 @@ public struct UiaaSessionState: Content {
     var errcode: String?
     var error: String?
     var flows: [UiaaAuthFlow]
-    var params: [String: [String:String]]?
+    var params: UiaaParams?
     var completed: [String]?
     var session: String
 }
