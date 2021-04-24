@@ -315,6 +315,9 @@ struct RegistrationController {
         }
         
         guard let hsResponseData = try? res.content.decode(UiaaSessionState.self) else {
+            if let string = try? res.content.decode(String.self) {
+                req.logger.warning("Failed to decode UIAA response: [\(string)]")
+            }
             return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Couldn't parse Matrix data"))
         }
         
@@ -335,7 +338,7 @@ struct RegistrationController {
             // 2) The other role for the signup token is to act as a stand-in
             //    for an Apple (or one day, Google) subscription for paid services.
             //    For a subscription service, there's no point in asking for
-            //    someone's username/password if they haven't already paid.
+            //    someone's username/password if they haven't already `paid.
             /*
             if flow.stages == ["m.login.dummy"] {
                 flow.stages = [LOGIN_STAGE_SIGNUP_TOKEN]
