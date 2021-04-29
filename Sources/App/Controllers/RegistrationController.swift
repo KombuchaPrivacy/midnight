@@ -320,6 +320,10 @@ struct RegistrationController {
             return err.encodeResponse(for: req)
         }
         
+        if let matrixError = try? res.content.decode(ResponseErrorContent.self) {
+            req.logger.info("CHUCKIE\tUIAA Response has an error: \(matrixError.errcode): \(matrixError.error)")
+        }
+        
         req.logger.debug("CHUCKIE\tRe-writing UIAA flows from the homeserver")
         var ourResponseData = hsResponseData
         ourResponseData.flows = []
