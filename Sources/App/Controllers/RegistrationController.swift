@@ -286,9 +286,13 @@ struct RegistrationController {
     -> EventLoopFuture<Response>
     {
         req.logger.debug("\t\(#function): Client response status = \(res.status)")
+        // cvw: Maybe Vapor actually makes this easier than I first thought...
+        return res.encodeResponse(for: req)
+        /*
         let response: Response
         if let body = res.body {
             req.logger.debug("\t\(#function): Got a response with content")
+            req.logger.debug("\t\(#function): Body = \(String.init())")
             // FIXME This is where we need to insert our own UIAA stages
             // in the response before it goes back to the client
             response = Response(status: res.status, body: .init(buffer: body))
@@ -297,6 +301,7 @@ struct RegistrationController {
             response = Response(status: res.status)
         }
         return req.eventLoop.makeSucceededFuture(response)
+        */
     }
     
     // MARK: handle UIAA Response
