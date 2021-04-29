@@ -324,7 +324,7 @@ struct RegistrationController {
         var ourResponseData = hsResponseData
         ourResponseData.flows = []
         for var flow in hsResponseData.flows {
-            req.logger.debug("CHUCKIE\tOld flow = \(flow.stages)")
+            //req.logger.debug("CHUCKIE\tOld flow = \(flow.stages)")
             // New idea: Keep the m.login.dummy stage hanging around.
             // This lets us return a response to the client after the token stage,
             // regardless of whether there are more "real" stages or not.
@@ -344,12 +344,13 @@ struct RegistrationController {
             } else
             */
             if !flow.stages.contains(LOGIN_STAGE_SIGNUP_TOKEN) {
-                req.logger.debug("CHUCKIE\tInserting signup_token in auth flows")
+                //req.logger.debug("CHUCKIE\tInserting signup_token in auth flows")
                 flow.stages.insert(LOGIN_STAGE_SIGNUP_TOKEN, at: 0)
-                req.logger.debug("CHUCKIE\tStages = \(flow.stages)")
+                //req.logger.debug("CHUCKIE\tStages = \(flow.stages)")
             }
-            req.logger.debug("CHUCKIE\tNew flow = \(flow.stages)")
+            //req.logger.debug("CHUCKIE\tNew flow = \(flow.stages)")
             ourResponseData.flows.append(flow)
+            req.logger.debug("CHUCKIE\tCompleted = \(ourResponseData.completed ?? [])")
         }
         //req.logger.debug("CHUCKIE\t\(#function): Returning response data = \(ourResponseData)")
         

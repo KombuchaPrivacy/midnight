@@ -48,9 +48,11 @@ public func configure(_ app: Application) throws {
     } else {
         app.logger.info("Using SQLite database")
         if let dbFilename = config.databaseFile {
+            app.logger.info("Using \(dbFilename) as sqlite db")
             app.databases.use(.sqlite(.file(dbFilename)), as: .sqlite)
         }
         else {
+            app.logger.info("Using local chuckie.sqlite")
             app.databases.use(.sqlite(.file("chuckie.sqlite")), as: .sqlite)
         }
     }
