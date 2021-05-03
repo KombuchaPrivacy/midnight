@@ -36,10 +36,33 @@ public final class UiaaMiddleware: Middleware {
                 // Attach its existing data to it
                 request.uiaaSession = .init(id: id, data: data)
 
-                return next.respond(to: request).map { response in
+                return next.respond(to: request).flatMap { response in
                     // Check whether we need to remove the session
                     request.logger.debug("UIAA\tChecking for existing session in response")
-                    return response
+                    
+                    // FIXME
+                    // If no session in response,
+                    //   Have the driver remove the session
+                    //     Then return the response
+                    // If there is a live session in the response,
+                    //   Have the driver update the session with the latest state
+                    //     Then return the response
+                    
+                    if let newState = try? response.content.decode(UiaaSessionState.self) {
+                        var data = UiaaSessionData(initialData: [:], initialState: newState)
+                        data["session"] = newState.session
+                        return self.driver.updateSession(id, to: data, for: request).map { _ in
+                            //return request.eventLoop.makeSucceededFuture(response)
+                            return response
+                        }
+                    } else {
+                        return self.driver.deleteSession(id, for: request).map { _ in
+                            //return request.eventLoop.makeSucceededFuture(response)
+                            return response
+                        }
+                    }
+                    
+                    //return response
                 }
             }
         } else {
