@@ -2,7 +2,7 @@
 //  SignupToken.swift
 //  
 //
-//  Created by Macro Ramius on 3/30/21.
+//  Created by Charles Wright on 3/30/21.
 //
 
 import Fluent

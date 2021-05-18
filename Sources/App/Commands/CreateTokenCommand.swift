@@ -2,7 +2,7 @@
 //  CreateTokenCommand.swift
 //  
 //
-//  Created by Macro Ramius on 4/9/21.
+//  Created by Charles Wright on 4/9/21.
 //
 
 import Foundation

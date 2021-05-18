@@ -2,7 +2,7 @@
 //  ResponseErrorContent.swift
 //  
 //
-//  Created by Macro Ramius on 4/12/21.
+//  Created by Charles Wright on 4/12/21.
 //
 
 import Foundation

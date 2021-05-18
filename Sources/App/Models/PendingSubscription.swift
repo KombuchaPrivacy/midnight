@@ -2,7 +2,7 @@
 //  PendingSubscription.swift
 //  
 //
-//  Created by Macro Ramius on 4/13/21.
+//  Created by Charles Wright on 4/13/21.
 //
 
 import Foundation

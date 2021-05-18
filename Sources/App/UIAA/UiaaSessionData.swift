@@ -2,7 +2,7 @@
 //  UiaaSessionData.swift
 //  Based on Vapor's SessionData
 //
-//  Created by Macro Ramius on 4/9/21.
+//  Created by Charles Wright on 4/9/21.
 //
 
 import Foundation

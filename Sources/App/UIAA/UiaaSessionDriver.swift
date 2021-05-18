@@ -2,7 +2,7 @@
 //  UiaaSessionDriver.swift
 //  Based on Vapor's MemorySessions
 //
-//  Created by Macro Ramius on 4/1/21.
+//  Created by Charles Wright on 4/1/21.
 //
 
 import Foundation

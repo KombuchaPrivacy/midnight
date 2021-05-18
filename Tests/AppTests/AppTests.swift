@@ -1,20 +1,7 @@
 @testable import App
 import XCTVapor
 
-final class AppTests: XCTestCase {
-    func testHelloWorld() throws {
-        let app = Application(.testing)
-        defer { app.shutdown() }
-        try configure(app)
-
-        try app.test(.GET, "hello", afterResponse: { res in
-            XCTAssertEqual(res.status, .ok)
-            XCTAssertEqual(res.body.string, "Hello, world!")
-        })
-    }
-}
-
-final class ChuckieTests: XCTestCase {
+final class MidnightTests: XCTestCase {
 
     func _register_second_request(_ app: Application, state: UiaaSessionState) throws {
         try app.test(.POST,
@@ -23,7 +10,7 @@ final class ChuckieTests: XCTestCase {
                     let auth = RegistrationUiaaAuthData(
                         session: state.session,
                         type: LOGIN_STAGE_SIGNUP_TOKEN,
-                        token: "3dbf-5ff3-e59c-e794"
+                        token: "1234-5678-abcd-efgh"
                     )
                     let body = RegistrationRequestBody(auth: auth, username: "bob", password: "hunter2", deviceId: "ABCDEFG", initialDeviceDisplayName: "iPhone")
                     try req.content.encode(body)

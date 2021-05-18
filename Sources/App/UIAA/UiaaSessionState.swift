@@ -2,7 +2,7 @@
 //  UiaaResponseData.swift
 //  
 //
-//  Created by Macro Ramius on 3/31/21.
+//  Created by Charles Wright on 3/31/21.
 //
 
 import Fluent
