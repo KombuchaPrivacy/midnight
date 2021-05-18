@@ -56,5 +56,14 @@ If you're using a reverse proxy like nginx, you should forward most of the Matri
 API endpoints directly to your "real" homeserver like Synapse.  Forward the
 registration-specific endpoints, like `/_matrix/client/(r0|v1)/register`, to Midnight.
 
-### Footnotes
+## Why token-based signup?
+Maybe you're running a small homeserver for your friends and family.
+You don't want to open up registration to the whole world, but you also don't want to deal
+with emailing everyone an initial password and hoping that they change it.
+(Protip: They won't.)
+
+Or, alternatively, maybe you're running a subscription service, like us.
+Midnight was developed for use with the upcoming [Circles](https://www.kickstarter.com/projects/cvwright/circles-a-secure-social-app-for-friends-and-family) project.
+
+## Footnotes
 <a name="footnote1"><sup>1</sup></a> Yes, the name is a silly reference to an old Steve Miller Band song.
