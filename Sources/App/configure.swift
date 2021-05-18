@@ -26,8 +26,8 @@ public func configure(_ app: Application) throws {
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     
     func getConfigData() throws -> Data {
-        guard let localConfigData = try? Data(contentsOf: URL(fileURLWithPath: "chuckie.json")) else {
-            let globalConfigData = try Data(contentsOf: URL(fileURLWithPath: "/matrix/chuckie/config/chuckie.json"))
+        guard let localConfigData = try? Data(contentsOf: URL(fileURLWithPath: "midnight.json")) else {
+            let globalConfigData = try Data(contentsOf: URL(fileURLWithPath: "/matrix/midnight/config/midnight.json"))
             return globalConfigData
         }
         return localConfigData
@@ -52,24 +52,14 @@ public func configure(_ app: Application) throws {
             app.databases.use(.sqlite(.file(dbFilename)), as: .sqlite)
         }
         else {
-            app.logger.info("Using local chuckie.sqlite")
-            app.databases.use(.sqlite(.file("chuckie.sqlite")), as: .sqlite)
+            app.logger.info("Using local midnight.sqlite")
+            app.databases.use(.sqlite(.file("midnight.sqlite")), as: .sqlite)
         }
     }
     
     app.logger.info("Setting up the registration controller")
     let reg = RegistrationController(app: app,
                                      homeserver: config.homeserver,
-                                     /*
-                                     homeserver: "beta.kombucha.social",
-                                     homeserver_scheme: .https,
-                                     homeserver_port: 443,
-                                     */
-                                     /*
-                                     homeserver: "192.168.1.89",
-                                     homeserver_scheme: .http,
-                                     homeserver_port: 6167,
-                                     */
                                      apiVersions: ["r0", "v1"])
     
     // register routes

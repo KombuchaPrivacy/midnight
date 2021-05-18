@@ -184,20 +184,20 @@ struct RegistrationController {
                     state.completed = completed
                     // Whoops, we also need to save this into our session state struct
                     session.data.state.completed = completed
-                    req.logger.debug("CHUCKIE\tCompleted = \(completed)")
-                    req.logger.debug("CHUCKIE\tFlows =")
+                    req.logger.debug("MIDNIGHT\tCompleted = \(completed)")
+                    req.logger.debug("MIDNIGHT\tFlows =")
                     for flow in flows {
-                        req.logger.debug("CHUCKIE\t\t\(flow.stages)")
+                        req.logger.debug("MIDNIGHT\t\t\(flow.stages)")
                     }
                     
                     // Are we done?
                     for flow in flows {
                         if flow.isSatisfiedBy(completed: completed) {
-                            req.logger.debug("CHUCKIE\tUIAA Auth is satisfied with auth flow: [\(flow.stages)]")
+                            req.logger.debug("MIDNIGHT\tUIAA Auth is satisfied with auth flow: [\(flow.stages)]")
                             // We're done with the UIAA auth
                             // Matrix spec says we should service the request now
                             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
-                                req.logger.debug("CHUCKIE\tGot HS response for /register")
+                                req.logger.debug("MIDNIGHT\tGot HS response for /register")
                                 req.logger.debug("\t\tStatus = \(hsResponse.status)")
                                 if hsResponse.status == .forbidden {
                                     if let err = try? hsResponse.content.decode(ResponseErrorContent.self) {
@@ -210,7 +210,7 @@ struct RegistrationController {
                         }
                     }
                     // If we're still here, then we're not done
-                    req.logger.debug("CHUCKIE\tMaking progress through UIAA auth.  Sending 401 to proceed.")
+                    req.logger.debug("MIDNIGHT\tMaking progress through UIAA auth.  Sending 401 to proceed.")
                     // Send another 401 so the client can continue the UIAA process
                     
                     // Copy the list of params (if any)
@@ -244,11 +244,11 @@ struct RegistrationController {
             }
             return handleSignupTokenRequest(req: req, token: token)
         default:
-            req.logger.debug("CHUCKIE\tWe don't handle requests of type \(data.auth.type)")
+            req.logger.debug("MIDNIGHT\tWe don't handle requests of type \(data.auth.type)")
             guard let session = req.uiaaSession,
                   let completed = session.data.state.completed,
                   completed.contains(LOGIN_STAGE_SIGNUP_TOKEN) else {
-                req.logger.info("CHUCKIE\tClient attempted \(data.auth.type) before completing token auth")
+                req.logger.info("MIDNIGHT\tClient attempted \(data.auth.type) before completing token auth")
                 let err = ResponseErrorContent(errcode: "TOKEN_STAGE_INCOMPLETE", error: "Must complete token auth before attempting other stages")
                 return err.encodeResponse(status: .forbidden, for: req)
             }
@@ -285,12 +285,12 @@ struct RegistrationController {
     func handleUiaaResponse(res: ClientResponse, for req: Request)
     -> EventLoopFuture<Response>
     {
-        req.logger.debug("CHUCKIE\tHandling UIAA Response")
+        req.logger.debug("MIDNIGHT\tHandling UIAA Response")
         
         // The only response that we need to work with is a 401
         // Everything else we return unmodified
         guard res.status == HTTPStatus.unauthorized else {
-            req.logger.debug("CHUCKIE\tUIAA response is not 401; Returning unmodified")
+            req.logger.debug("MIDNIGHT\tUIAA response is not 401; Returning unmodified")
             // FIXME Make sure that 401's are all we need to touch
             //       Could there be 403's where we need to re-write the flows?
             return proxyResponseToClientUnmodified(res: res, for: req)
@@ -303,14 +303,14 @@ struct RegistrationController {
         }
         
         if let matrixError = try? res.content.decode(ResponseErrorContent.self) {
-            req.logger.info("CHUCKIE\tUIAA Response has an error: \(matrixError.errcode): \(matrixError.error)")
+            req.logger.info("MIDNIGHT\tUIAA Response has an error: \(matrixError.errcode): \(matrixError.error)")
         }
         
-        req.logger.debug("CHUCKIE\tRe-writing UIAA flows from the homeserver")
+        req.logger.debug("MIDNIGHT\tRe-writing UIAA flows from the homeserver")
         var ourResponseData = hsResponseData
         ourResponseData.flows = []
         for var flow in hsResponseData.flows {
-            //req.logger.debug("CHUCKIE\tOld flow = \(flow.stages)")
+            //req.logger.debug("MIDNIGHT\tOld flow = \(flow.stages)")
             // New idea: Keep the m.login.dummy stage hanging around.
             // This lets us return a response to the client after the token stage,
             // regardless of whether there are more "real" stages or not.
@@ -330,15 +330,15 @@ struct RegistrationController {
             } else
             */
             if !flow.stages.contains(LOGIN_STAGE_SIGNUP_TOKEN) {
-                //req.logger.debug("CHUCKIE\tInserting signup_token in auth flows")
+                //req.logger.debug("MIDNIGHT\tInserting signup_token in auth flows")
                 flow.stages.insert(LOGIN_STAGE_SIGNUP_TOKEN, at: 0)
-                //req.logger.debug("CHUCKIE\tStages = \(flow.stages)")
+                //req.logger.debug("MIDNIGHT\tStages = \(flow.stages)")
             }
-            //req.logger.debug("CHUCKIE\tNew flow = \(flow.stages)")
+            //req.logger.debug("MIDNIGHT\tNew flow = \(flow.stages)")
             ourResponseData.flows.append(flow)
-            req.logger.debug("CHUCKIE\tCompleted = \(ourResponseData.completed ?? [])")
+            req.logger.debug("MIDNIGHT\tCompleted = \(ourResponseData.completed ?? [])")
         }
-        //req.logger.debug("CHUCKIE\t\(#function): Returning response data = \(ourResponseData)")
+        //req.logger.debug("MIDNIGHT\t\(#function): Returning response data = \(ourResponseData)")
         
         // FIXME Move this to the UIAA Middleware..
         /*
@@ -512,7 +512,7 @@ struct RegistrationController {
     func handleRequestWithoutUiaa(req: Request)
     -> EventLoopFuture<Response>
     {
-        req.logger.debug("CHUCKIE\t0. No UIAA session.  Running \"preflight\" checks on the registration request")
+        req.logger.debug("MIDNIGHT\t0. No UIAA session.  Running \"preflight\" checks on the registration request")
 
         // The Matrix CS API mandates that we do some early sanity checks on the requested account data
         /*
@@ -545,9 +545,9 @@ struct RegistrationController {
             // Doesn't appear that we got any registration data.
             // Probably the client is just probing to see what UIAA flows we support.
             // Pass the request along to the homeserver
-            req.logger.debug("CHUCKIE\t1. No registration data.  Sending this one to the homeserver.")
+            req.logger.debug("MIDNIGHT\t1. No registration data.  Sending this one to the homeserver.")
             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
-                req.logger.debug("CHUCKIE\t2. Got proxy response -- Status = \(hsResponse.status)")
+                req.logger.debug("MIDNIGHT\t2. Got proxy response -- Status = \(hsResponse.status)")
                 return handleUiaaResponse(res: hsResponse, for: req)
             }
         }
@@ -593,9 +593,9 @@ struct RegistrationController {
         */
                             // Let's get this party started
                             // Forward the request to the homeserver to start the UIAA session
-                            req.logger.debug("CHUCKIE\t3. No UIAA session in request, but it's a good, valid request.  Proxying it...")
+                            req.logger.debug("MIDNIGHT\t3. No UIAA session in request, but it's a good, valid request.  Proxying it...")
                             return proxyRequestToHomeserver(req: req).flatMap { hsResponse in
-                                req.logger.debug("CHUCKIE\t4. Got proxy response -- Status = \(hsResponse.status)")
+                                req.logger.debug("MIDNIGHT\t4. Got proxy response -- Status = \(hsResponse.status)")
                                 return handleUiaaResponse(res: hsResponse, for: req)
                             }
         /*
@@ -656,7 +656,7 @@ struct RegistrationController {
         //     - If not, remove any mention of our stages and pass the request along to the homeserver
         //     On the response, add back in the stages that we handle
         if let requestData = try? req.content.decode(RegistrationRequestBody.self) {
-            req.logger.debug("CHUCKIE\tHandling registration request with active session")
+            req.logger.debug("MIDNIGHT\tHandling registration request with active session")
             return handleUiaaRequest(req: req, with: requestData)
         }
         
@@ -710,12 +710,12 @@ struct RegistrationController {
                                 host: homeserver.host,
                                 port: homeserver.port,
                                 path: req.url.path)
-        req.logger.debug("CHUCKIE\tProxying request to homeserver at \(homeserverURI)")
+        req.logger.debug("MIDNIGHT\tProxying request to homeserver at \(homeserverURI)")
 
         return req.client.post(homeserverURI,
                                headers: req.headers) { hsRequest in
             // Patch up the headers to point to the homeserver instead of us
-            // This may not be necessary in deployment, when we're all behind the nginx proxy anyway, but it certainly helps during development where Chuckie is running on the local machine
+            // This may not be necessary in deployment, when we're all behind the nginx proxy anyway, but it certainly helps during development where Midnight is running on the local machine
             if let hsHost = homeserver.host {
                 hsRequest.headers.remove(name: "Host")
                 hsRequest.headers.add(name: "Host", value: hsHost)
