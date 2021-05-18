@@ -34,6 +34,11 @@ For example, a homeserver might want to block anyone from registering with the u
 This would still allow usernames like "Groot" or "TreeRoots" to be used, as long as they don't
 match a reserved name exactly.
 
+By default, Midnight also enforces a set of readability constraints on usernames, more strict
+than the official Matrix specification.
+It rejects usernames that start or end with punctuation, as these could be used to impersonate
+other accounts, e.g. registering as "bob." or "bob_" to impersonate the real account "bob".
+
 ## Roadmap
 In the near future, we plan to add integration with Apple's App Store subscriptions.
 This would allow any user with a valid subscription to register for a Matrix account on the
