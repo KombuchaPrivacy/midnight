@@ -13,19 +13,10 @@ let LOGIN_STAGE_SIGNUP_TOKEN = "social.kombucha.login.signup_token"
 
 struct RegistrationController {
     var app: Application
-    
-    /*
-    var homeserver: String
-    var homeserver_scheme: URI.Scheme = .https
-    var homeserver_port: Int
-    */
     var homeserver: URL
     var apiVersions: [String]
     
-
-    
     // MARK: Pending subscriptions
-    
     func createPendingSubscription(for req: Request, given numSlots: Int) //throws
     -> EventLoopFuture<Void>
     {
@@ -79,7 +70,6 @@ struct RegistrationController {
     }
     
     // MARK: Signup Tokens
-    
     // Check the validity of the supplied token
     // Return the number of available registration slots for it
     func validateSignupToken(_ userToken: String, forRequest req: Request)
@@ -184,11 +174,13 @@ struct RegistrationController {
                     state.completed = completed
                     // Whoops, we also need to save this into our session state struct
                     session.data.state.completed = completed
+                    /*
                     req.logger.debug("MIDNIGHT\tCompleted = \(completed)")
                     req.logger.debug("MIDNIGHT\tFlows =")
                     for flow in flows {
                         req.logger.debug("MIDNIGHT\t\t\(flow.stages)")
                     }
+                    */
                     
                     // Are we done?
                     for flow in flows {
@@ -226,7 +218,6 @@ struct RegistrationController {
     }
     
     // MARK: handle UIAA Request
-    
     func handleUiaaRequest(req: Request, with data: RegistrationRequestBody) //throws
     -> EventLoopFuture<Response>
     {
@@ -262,23 +253,8 @@ struct RegistrationController {
     func proxyResponseToClientUnmodified(res: ClientResponse, for req: Request)
     -> EventLoopFuture<Response>
     {
-        req.logger.debug("\t\(#function): Client response status = \(res.status)")
-        // cvw: Maybe Vapor actually makes this easier than I first thought...
+        //req.logger.debug("\t\(#function): Client response status = \(res.status)")
         return res.encodeResponse(for: req)
-        /*
-        let response: Response
-        if let body = res.body {
-            req.logger.debug("\t\(#function): Got a response with content")
-            req.logger.debug("\t\(#function): Body = \(String.init())")
-            // FIXME This is where we need to insert our own UIAA stages
-            // in the response before it goes back to the client
-            response = Response(status: res.status, body: .init(buffer: body))
-        } else {
-            req.logger.debug("\t\(#function): Got empty response")
-            response = Response(status: res.status)
-        }
-        return req.eventLoop.makeSucceededFuture(response)
-        */
     }
     
     // MARK: handle UIAA Response
@@ -310,25 +286,6 @@ struct RegistrationController {
         var ourResponseData = hsResponseData
         ourResponseData.flows = []
         for var flow in hsResponseData.flows {
-            //req.logger.debug("MIDNIGHT\tOld flow = \(flow.stages)")
-            // New idea: Keep the m.login.dummy stage hanging around.
-            // This lets us return a response to the client after the token stage,
-            // regardless of whether there are more "real" stages or not.
-            // Then, the client can show a new UI element to get the user's
-            // desired username and password before submitting the next request.
-            // Otherwise, we'd have to ask for username and password before
-            // validating the token, and that would be weird.
-            // 1) It's jerky to act like we can create an account for them
-            //    if/when the token is invalid or already expired etc
-            // 2) The other role for the signup token is to act as a stand-in
-            //    for an Apple (or one day, Google) subscription for paid services.
-            //    For a subscription service, there's no point in asking for
-            //    someone's username/password if they haven't already paid.
-            /*
-            if flow.stages == ["m.login.dummy"] {
-                flow.stages = [LOGIN_STAGE_SIGNUP_TOKEN]
-            } else
-            */
             if !flow.stages.contains(LOGIN_STAGE_SIGNUP_TOKEN) {
                 //req.logger.debug("MIDNIGHT\tInserting signup_token in auth flows")
                 flow.stages.insert(LOGIN_STAGE_SIGNUP_TOKEN, at: 0)
@@ -340,27 +297,12 @@ struct RegistrationController {
         }
         //req.logger.debug("MIDNIGHT\t\(#function): Returning response data = \(ourResponseData)")
         
-        // FIXME Move this to the UIAA Middleware..
-        /*
-        // Update the list of completed stages
-        if req.hasUiaaSession,
-           let state = req.uiaaSession?.data.state,
-            let completed = state.completed {
-            for stage in hsResponseData.completed ?? [] {
-                if !completed.contains(stage) {
-                    var session = req.uiaaSession!
-                    session.data["completed"].append(stage)
-                }
-            }
-        }
-        */
         ourResponseData.completed = req.uiaaSession?.data.state.completed
         
         return ourResponseData.encodeResponse(status: .unauthorized, for: req)
     }
     
     // MARK: Username validation
-    
     func validateUsernameFormat(username: String)
     -> Bool {
         let ALLOWED_PUNCTUATION = "-.=_"
@@ -402,7 +344,7 @@ struct RegistrationController {
             return false
         }
         // This one is from the Matrix spec
-        if localPart.count > 255 - "@kombucha.social".count {
+        if localPart.count > 255 - self.homeserver.host!.count {
             return false
         }
         // This one is from me, to keep our usernames looking (somewhat) sane and manageable:
@@ -508,7 +450,6 @@ struct RegistrationController {
     }
     
     // MARK: Handle Request w/o UIAA
-    
     func handleRequestWithoutUiaa(req: Request)
     -> EventLoopFuture<Response>
     {
@@ -609,15 +550,6 @@ struct RegistrationController {
     // ^^ Look at this freaking pyramid of doom we've got going here...
     
     // MARK: Main handleRegisterRequest
-    
-    // Improved approach.  Two core functions:
-    // * handleRegisterRequest - Looks at the request and decides what to do with it
-    //   - Handle it ourselves
-    //   - Proxy it to the homeserver unchanged
-    //   - Proxy it to the homeserver with some modifications
-    // * handleRegisterResponse - Handle the response from the homeserver
-    //   - hmmm..  Not sure we really need a generic version of the response handler
-    //   - Different kinds of responses require different handlers
     func handleRegisterRequest(req: Request) throws
     -> EventLoopFuture<Response>
     {
@@ -637,9 +569,11 @@ struct RegistrationController {
             return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.badRequest, reason: "The requested account type is not supported"))
         }
         
+        /*
         if let stringBody = req.body.string {
             req.logger.debug("Got request with body [\(stringBody)]")
         }
+        */
         
         // What is this request?
         // 1. Before UIAA -- No 'auth' parameter, no UIAA session
@@ -663,12 +597,10 @@ struct RegistrationController {
         
         // What is this request?
         // 3. After UIAA -- This is the actual registration request data
-        //   + Action: Enforce any username and password policies beyond those of the homeserver
-        //     - If one or both fails, send our own response back to the client
-        //     - If the requested username/password are good, pass them along to the homeserver
-        //       On the response, clean up any temporary data that we created (like pending subscriptions)
-        //       and add the new user to our table of current subscriptions
-        // FIXME TODO
+        //    Edit: Nope, that's not how UIAA works.
+        //    In reality, the final UIAA stage proceeds directly to handling
+        //    the "real" request.  So we should never see a "bare" request
+        //    here without a UIAA stage.
         
         //return req.eventLoop.makeFailedFuture(Abort(HTTPStatus.notImplemented, reason: "FIXME We don't handle actual registration data yet"))
         // Actually we shouldn't be here at all.
@@ -715,7 +647,9 @@ struct RegistrationController {
         return req.client.post(homeserverURI,
                                headers: req.headers) { hsRequest in
             // Patch up the headers to point to the homeserver instead of us
-            // This may not be necessary in deployment, when we're all behind the nginx proxy anyway, but it certainly helps during development where Midnight is running on the local machine
+            // This may not be necessary in some deployments, when we're all
+            // behind the nginx proxy anyway, but it certainly helps during
+            // development where Midnight is running on the local machine
             if let hsHost = homeserver.host {
                 hsRequest.headers.remove(name: "Host")
                 hsRequest.headers.add(name: "Host", value: hsHost)
