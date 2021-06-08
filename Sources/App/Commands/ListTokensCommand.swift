@@ -24,9 +24,24 @@ struct ListTokensCommand: Command {
         let db = context.application.db
         let logger = context.application.logger
 
-        let _ = SignupToken.query(on: db)
+        guard let signupTokens = try? SignupToken.query(on: db)
             .filter(\.$createdBy == signature.user)
             .all()
+            .wait()
+        else {
+            logger.critical("Database query failed")
+            return
+        }
+
+        if signupTokens.isEmpty {
+            logger.critical("No matching tokens")
+        } else {
+            for signupToken in signupTokens {
+                logger.info("Token: \(signupToken.token)")
+            }
+        }
+
+            /*
             .map { signupTokens in
                 if signupTokens.isEmpty {
                     logger.critical("No matching tokens")
@@ -35,6 +50,9 @@ struct ListTokensCommand: Command {
                         logger.critical("Token: \(signupToken.token)")
                     }
                 }
+
             }
+            */
+
     }
 }
