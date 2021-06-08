@@ -56,6 +56,11 @@ public func configure(_ app: Application) throws {
             app.databases.use(.sqlite(.file("midnight.sqlite")), as: .sqlite)
         }
     }
+
+    let ids = app.databases.ids()
+    for id in ids {
+        app.logger.info("Found database \(id)")
+    }
     
     app.logger.info("Setting up the registration controller")
     let reg = RegistrationController(app: app,
