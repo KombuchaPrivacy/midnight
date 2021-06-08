@@ -20,7 +20,7 @@ final class SignupToken: Model {
     
     // How many users can subscribe with this token?
     @Field(key: "slots")
-    var slots: UInt
+    var slots: Int
     
     // What rights does this token confer?
     // * How long does the subscription last? (in days)
@@ -31,7 +31,7 @@ final class SignupToken: Model {
     @Field(key: "access_level")
     var accessLevel: String
     @Field(key: "access_duration")
-    var accessDuration: UInt
+    var accessDuration: Int
     
     // Other data to help us analyze the social graph, detect fraud etc
     @Field(key: "created_by")
@@ -48,7 +48,7 @@ final class SignupToken: Model {
     
     init() {}
     
-    init(id: UUID? = nil, for userId: String, slots: UInt, accessLevel: String, accessDuration: UInt, expiresAt: Date? = nil) {
+    init(id: UUID? = nil, for userId: String, slots: Int, accessLevel: String, accessDuration: Int, expiresAt: Date? = nil) {
         self.id = id
         //self.token = String(format: "%016llx", UInt64.random())
         self.token = String(format: "%04x-%04x-%04x-%04x",

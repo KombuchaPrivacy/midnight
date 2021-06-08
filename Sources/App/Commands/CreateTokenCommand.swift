@@ -20,13 +20,13 @@ struct CreateTokenCommand: Command {
         var user: String
         
         @Argument(name: "slots")
-        var slots: UInt
+        var slots: Int
         
         @Argument(name: "access-level")
         var level: String
         
         @Argument(name: "access-duration")
-        var duration: UInt
+        var duration: Int
         
         @Argument(name: "valid-for")
         var validDays: UInt
