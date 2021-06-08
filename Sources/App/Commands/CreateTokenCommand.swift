@@ -46,7 +46,10 @@ struct CreateTokenCommand: Command {
         let logger = context.application.logger
         //print("Creating token [\(token.token)]")
         logger.info("Creating token [\(token.token)]")
-        
+
+        let dgroup = DispatchGroup()
+
+        dgroup.enter()
         context.application.db.transaction { (database) -> EventLoopFuture<Void> in
             logger.info("Saving token [\(token.token)] in the database...")
             return token.save(on: database)
@@ -58,6 +61,11 @@ struct CreateTokenCommand: Command {
             case .success:
                 logger.critical("Token: \(token.token)")
             }
+            dgroup.leave()
+        }
+
+        dgroup.notify(queue: .main) {
+            logger.info("Done")
         }
         
         /*
