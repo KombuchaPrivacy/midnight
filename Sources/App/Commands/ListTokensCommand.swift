@@ -22,12 +22,18 @@ struct ListTokensCommand: Command {
     
     func run(using context: CommandContext, signature: Signature) throws {
         let db = context.application.db
+        let logger = context.application.logger
+
         let _ = SignupToken.query(on: db)
             .filter(\.$createdBy == signature.user)
             .all()
             .map { signupTokens in
-                for signupToken in signupTokens {
-                    print(signupToken.token)
+                if signupTokens.isEmpty {
+                    logger.critical("No matching tokens")
+                } else {
+                    for signupToken in signupTokens {
+                        logger.critical("Token: \(signupToken.token)")
+                    }
                 }
             }
     }
