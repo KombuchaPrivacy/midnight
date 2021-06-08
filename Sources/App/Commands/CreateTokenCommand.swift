@@ -47,13 +47,21 @@ struct CreateTokenCommand: Command {
         //print("Creating token [\(token.token)]")
         logger.info("Creating token [\(token.token)]")
 
-        let dgroup = DispatchGroup()
+        //let dgroup = DispatchGroup()
 
-        dgroup.enter()
-        context.application.db.transaction { (database) -> EventLoopFuture<Void> in
+        //dgroup.enter()
+        guard let result = try? context.application.db.transaction({ (database) -> EventLoopFuture<Void> in
             logger.info("Saving token [\(token.token)] in the database...")
             return token.save(on: database)
-        }.whenComplete { result in
+        }).wait()
+        else {
+            logger.critical("Transaction failed")
+            return
+        }
+        logger.info("Done")
+
+        /*
+        //.whenComplete { result in
             logger.info("Done with transaction")
             switch result {
             case .failure(let err):
@@ -62,23 +70,10 @@ struct CreateTokenCommand: Command {
                 logger.critical("Token: \(token.token)")
             }
             dgroup.leave()
-        }
-
-        let seconds = 4.0
-        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
-            // Put your code which should be executed with a delay here
-            logger.info("asyncAfter")
-        }
-
-        dgroup.notify(queue: .main) {
-            logger.info("Done")
-        }
-        
-        /*
-        whenSuccess {
-            print(token.token)
+        //}
         }
         */
+
     }
     
 }
