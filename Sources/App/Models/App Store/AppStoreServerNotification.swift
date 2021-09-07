@@ -265,9 +265,9 @@ struct AppStoreServerNotification: Content {
         // An array where each element contains the pending renewal information for each auto-renewable subscription identified in product_id. The contents of this array are identical to those in responseBody.Pending_renewal_info in the verifyReceipt endpoint response for receipt validation.
         // https://developer.apple.com/documentation/appstoreservernotifications/unified_receipt/pending_renewal_info
         struct PendingRenewalInfo: Codable {
-            //auto_renew_product_id
+            // auto_renew_product_id
             // string
-            //The current renewal preference for the auto-renewable subscription. The value for this key corresponds to the productIdentifier property of the product that the customer’s subscription renews.
+            // The current renewal preference for the auto-renewable subscription. The value for this key corresponds to the productIdentifier property of the product that the customer’s subscription renews.
             var autoRenewProductId: String
 
             // auto_renew_status
@@ -351,6 +351,7 @@ struct AppStoreServerNotification: Content {
         // Value: 0
         var status: Int
     }
+    var unifiedReceipt: UnifiedReceipt
 
     // bid
     // string
