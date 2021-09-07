@@ -9,6 +9,8 @@ import Foundation
 import Vapor
 import Fluent
 
+#if false
+
 struct AppStoreNotificationController {
     var app: Application
     var homeserver: URL
@@ -258,3 +260,6 @@ struct AppStoreNotificationController {
         // On the server, we should hang tight for now, as their current subscription is still valid until its natural expiration
     }
 }
+
+#endif
+
