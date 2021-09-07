@@ -12,6 +12,7 @@ public struct RegistrationUiaaAuthData: UiaaAuthData {
     var session: String
     var type: String
     var token: String?
+    var appleReceipt: String?
 }
 
 public struct RegistrationRequestBody: UiaaRequestData {

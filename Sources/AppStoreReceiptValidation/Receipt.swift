@@ -4,6 +4,7 @@
  * License: Apache 2.0
  */
 
+#if false
 
 import struct Foundation.Date
 
@@ -390,3 +391,5 @@ extension KeyedDecodingContainer {
         return Date(timeIntervalSince1970: timeIntervalSince1970inMs / 1000)
     }
 }
+
+#endif

@@ -4,6 +4,8 @@
  * License: Apache 2.0
  */
 
+#if false
+
 import AsyncHTTPClient
 import class Foundation.JSONDecoder
 import class Foundation.JSONEncoder
@@ -105,3 +107,5 @@ public enum AppStore {
 extension JSONEncoder: AppStoreClientRequestEncoder {}
 
 extension JSONDecoder: AppStoreClientResponseDecoder {}
+
+#endif

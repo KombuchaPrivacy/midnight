@@ -86,7 +86,7 @@ struct AppStoreNotificationController {
         // See documentation here: https://developer.apple.com/documentation/appstoreserverapi/send_consumption_information
         // We're supposed to send a
         // PUT https://api.storekit.itunes.apple.com/inApps/v1/transactions/consumption/{originalTransactionId}
-        let consumptionUrl = URL(string: "https://api.storekit.itunes.apple.com/inApps/v1/transactions/consumption/{originalTransactionId}")
+        let consumptionUrl = URL(string: "https://api.storekit.itunes.apple.com/inApps/v1/transactions/consumption/{originalTransactionId}")!
         req.client.put(url: consumptionUrl) { clientReq in
             var consumptionRequest = ConsumptionRequest()
             try req.content.encode(consumptionRequest)

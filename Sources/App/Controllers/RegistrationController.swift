@@ -10,6 +10,7 @@ import Vapor
 import Fluent
 
 let LOGIN_STAGE_SIGNUP_TOKEN = "social.kombucha.login.signup_token"
+let LOGIN_STAGE_APPLE_SUBSCRIPTION = "social.kombucha.login.subscription.apple"
 
 struct RegistrationController {
     var app: Application
@@ -216,6 +217,34 @@ struct RegistrationController {
                 }
             }
     }
+
+    func handleAppleSubscriptionRequest(req: Request, receipt: String)
+    -> EventLoopFuture<Response>
+    {
+        // Send a request to Apple to validate the receipt
+        //   - First try the production App Store URL https://buy.itunes.apple.com/verifyReceipt
+        //   - If we can't validate with the production App Store, try the sandbox environment https://sandbox.itunes.apple.com/verifyReceipt
+
+        let appStoreClient = AppStore.Client(httpClient: req.client, secret: "foo")
+
+        // Then (from https://developer.apple.com/documentation/storekit/original_api_for_in-app_purchase/validating_receipts_with_the_app_store)
+        /*
+        Parse the Response
+        The App Store's response payload is a JSON object that contains the keys and values detailed in responseBody.
+
+        The in_app array contains the non-consumable, non-renewing subscription, and auto-renewable subscription items previously purchased by the user. Check the values in the response for these in-app purchase types to verify transactions as needed.
+
+        For auto-renewable subscription items, parse the response to get information about the currently active subscription period. When you validate the receipt for a subscription, latest_receipt contains the latest encoded receipt, which is the same as the value for receipt-data in the request, and latest_receipt_info contains all the transactions for the subscription, including the initial purchase and subsequent renewals but not including any restores.
+
+        You can use these values to check whether an auto-renewable subscription has expired. Use these values along with the expiration_intent subscription field to get the reason for expiration.
+        */
+
+        // Ok so it looks like we need to look at:
+        //   * latest_receipt
+        //   * latest_receipt_info
+        //   * latest_receipt_info -> initial purchase
+        //   * expiration_intent (???)
+    }
     
     // MARK: handle UIAA Request
     func handleUiaaRequest(req: Request, with data: RegistrationRequestBody) //throws
@@ -234,6 +263,13 @@ struct RegistrationController {
                 return err.encodeResponse(status: .badRequest, for: req)
             }
             return handleSignupTokenRequest(req: req, token: token)
+        case LOGIN_STAGE_APPLE_SUBSCRIPTION:
+            req.logger.debug("APPLE\tFound an Apple subscription request")
+            guard let receipt = data.auth.appleReceipt else {
+                let err = ResponseErrorContent(errcode: "RECEIPT_MISSING", error: "No App Store receipt provided")
+                return err.encodeResponse(status: .badRequest, for: req)
+            }
+            return handleAppleSubscriptionRequest(req: req, receipt: receipt)
         default:
             req.logger.debug("MIDNIGHT\tWe don't handle requests of type \(data.auth.type)")
             guard let session = req.uiaaSession,

@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "midnight",
     platforms: [
-       .macOS(.v10_15)
+        .macOS(.v10_15),
     ],
     dependencies: [
         // 💧 A server-side Swift web framework.
@@ -13,6 +13,10 @@ let package = Package(
         .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.0.0"),
         .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.0.0"),
         .package(url: "https://github.com/nodes-vapor/gatekeeper.git", from: "4.0.0"),
+        // For https://github.com/slashmo/swift-app-store-receipt-validation
+        .package(url: "https://github.com/swift-server/async-http-client", .upToNextMajor(from: "1.1.0")),
+        .package(url: "https://github.com/apple/swift-nio", .upToNextMajor(from: "2.14.0")),
+        .package(url: "https://github.com/slashmo/swift-app-store-receipt-validation", .upToNextMajor(from: "0.1.0")),
     ],
     targets: [
         .target(
@@ -23,6 +27,10 @@ let package = Package(
                 .product(name: "FluentSQLiteDriver", package: "fluent-sqlite-driver"),
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "Gatekeeper", package: "gatekeeper"),
+                // For https://github.com/slashmo/swift-app-store-receipt-validation
+                .product(name: "NIO", package: "swift-nio"),
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "AppStoreReceiptValidation", package: "swift-app-store-receipt-validation"),
             ],
             swiftSettings: [
                 // Enable better optimizations when building in Release configuration. Despite the use of

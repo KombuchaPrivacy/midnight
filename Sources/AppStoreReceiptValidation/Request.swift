@@ -4,6 +4,8 @@
  * License: Apache 2.0
  */
 
+#if false
+
 extension AppStore {
     enum Environment: String, Codable {
         case sandbox = "Sandbox"
@@ -57,3 +59,5 @@ extension AppStore {
         }
     }
 }
+
+#endif
