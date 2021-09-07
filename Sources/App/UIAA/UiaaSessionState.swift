@@ -36,9 +36,14 @@ public struct mLoginTermsParams: Content {
     var policies: [String:PolicyInfo]
 }
 
+public struct AppleSubscriptionParams: Content {
+    var productIds: [String]
+}
+
 //typealias UiaaStateParams = [String: [String:String]]?
 public struct UiaaParams: Content {
     var terms: mLoginTermsParams?
+    var appStore: AppleSubscriptionParams?
 }
 
 public struct UiaaSessionState: Content {

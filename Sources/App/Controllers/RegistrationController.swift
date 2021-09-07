@@ -13,6 +13,7 @@ let LOGIN_STAGE_SIGNUP_TOKEN = "social.kombucha.login.signup_token"
 let LOGIN_STAGE_APPLE_SUBSCRIPTION = "social.kombucha.login.subscription.apple"
 let BUNDLE_ID_CIRCLES = "social.kombucha.circles"
 
+// FIXME Move this into the config file
 let SUBSCRIPTION_OFFERINGS = ["social.kombucha.circles.standard01month", "social.kombucha.circles.standard12month"]
 
 struct RegistrationController {
@@ -366,19 +367,28 @@ struct RegistrationController {
         req.logger.debug("MIDNIGHT\tRe-writing UIAA flows from the homeserver")
         var ourResponseData = hsResponseData
         ourResponseData.flows = []
-        for var flow in hsResponseData.flows {
-            if !flow.stages.contains(LOGIN_STAGE_SIGNUP_TOKEN) {
-                //req.logger.debug("MIDNIGHT\tInserting signup_token in auth flows")
-                flow.stages.insert(LOGIN_STAGE_SIGNUP_TOKEN, at: 0)
-                //req.logger.debug("MIDNIGHT\tStages = \(flow.stages)")
+        for var oldFlow in hsResponseData.flows {
+
+            for newStage in [LOGIN_STAGE_SIGNUP_TOKEN, LOGIN_STAGE_APPLE_SUBSCRIPTION] {
+                var newFlow = UiaaAuthFlow(stages: [])
+
+                if !oldFlow.stages.contains(LOGIN_STAGE_SIGNUP_TOKEN) {
+                    newFlow.stages.append(newStage)
+                }
+                newFlow.stages.append(contentsOf: oldFlow.stages)
+
+                //req.logger.debug("MIDNIGHT\tNew flow = \(newFlow.stages)")
+                ourResponseData.flows.append(newFlow)
             }
-            //req.logger.debug("MIDNIGHT\tNew flow = \(flow.stages)")
-            ourResponseData.flows.append(flow)
             req.logger.debug("MIDNIGHT\tCompleted = \(ourResponseData.completed ?? [])")
         }
         //req.logger.debug("MIDNIGHT\t\(#function): Returning response data = \(ourResponseData)")
         
         ourResponseData.completed = req.uiaaSession?.data.state.completed
+        if ourResponseData.params == nil {
+            ourResponseData.params = UiaaParams()
+        }
+        ourResponseData.params!.appStore = AppleSubscriptionParams(productIds: SUBSCRIPTION_OFFERINGS)
         
         return ourResponseData.encodeResponse(status: .unauthorized, for: req)
     }
