@@ -4,9 +4,9 @@
  * License: Apache 2.0
  */
 
-#if false
-
 import struct Foundation.Date
+
+import Vapor
 
 public extension AppStore {
     enum Error: Swift.Error {
@@ -75,7 +75,7 @@ public extension AppStore {
         }
     }
 
-    struct Receipt: Codable {
+    struct Receipt: Content {
         public let bundleId: String
         public let applicationVersion: String
         public let inApp: [InAppPurchase]
@@ -93,7 +93,7 @@ public extension AppStore {
         }
     }
 
-    struct InAppPurchase: Codable {
+    struct InAppPurchase: Content {
         /// The number of items purchased.
         ///
         /// This value corresponds to the quantity property of the SKPayment object stored in the transaction’s payment property.
@@ -392,4 +392,3 @@ extension KeyedDecodingContainer {
     }
 }
 
-#endif

@@ -4,7 +4,7 @@
  * License: Apache 2.0
  */
 
-#if false
+import Vapor
 
 extension AppStore {
     enum Environment: String, Codable {
@@ -23,7 +23,7 @@ extension AppStore {
 }
 
 extension AppStore {
-    struct Request: Codable {
+    public struct Request: Content {
         let receiptData: String
         let password: String?
         let excludeOldTransactions: Bool?
@@ -41,7 +41,7 @@ extension AppStore {
         let status: Int
     }
 
-    struct Response: Codable {
+    public struct Response: Content {
         let receipt: Receipt // json
         let latestReceipt: String?
         let latestReceiptInfo: Receipt? // json
@@ -60,4 +60,3 @@ extension AppStore {
     }
 }
 
-#endif

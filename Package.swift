@@ -16,7 +16,8 @@ let package = Package(
         // For https://github.com/slashmo/swift-app-store-receipt-validation
         .package(url: "https://github.com/swift-server/async-http-client", .upToNextMajor(from: "1.1.0")),
         .package(url: "https://github.com/apple/swift-nio", .upToNextMajor(from: "2.14.0")),
-        .package(url: "https://github.com/slashmo/swift-app-store-receipt-validation", .upToNextMajor(from: "0.1.0")),
+        // I got tired of trying to make Vapor expose its underlying Swift NIO bits -- Ultimately it's easier to re-write the receipt validation package's Client class to just use Vapor directly.  smh.
+        //.package(url: "https://github.com/slashmo/swift-app-store-receipt-validation", .upToNextMajor(from: "0.1.0")),
     ],
     targets: [
         .target(
@@ -30,7 +31,7 @@ let package = Package(
                 // For https://github.com/slashmo/swift-app-store-receipt-validation
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
-                .product(name: "AppStoreReceiptValidation", package: "swift-app-store-receipt-validation"),
+                //.product(name: "AppStoreReceiptValidation", package: "swift-app-store-receipt-validation"),
             ],
             swiftSettings: [
                 // Enable better optimizations when building in Release configuration. Despite the use of

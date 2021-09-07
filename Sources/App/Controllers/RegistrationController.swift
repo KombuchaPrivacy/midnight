@@ -11,6 +11,9 @@ import Fluent
 
 let LOGIN_STAGE_SIGNUP_TOKEN = "social.kombucha.login.signup_token"
 let LOGIN_STAGE_APPLE_SUBSCRIPTION = "social.kombucha.login.subscription.apple"
+let BUNDLE_ID_CIRCLES = "social.kombucha.circles"
+
+let SUBSCRIPTION_OFFERINGS = ["social.kombucha.circles.standard01month", "social.kombucha.circles.standard12month"]
 
 struct RegistrationController {
     var app: Application
@@ -225,7 +228,49 @@ struct RegistrationController {
         //   - First try the production App Store URL https://buy.itunes.apple.com/verifyReceipt
         //   - If we can't validate with the production App Store, try the sandbox environment https://sandbox.itunes.apple.com/verifyReceipt
 
-        let appStoreClient = AppStore.Client(httpClient: req.client, secret: "foo")
+        let appStoreClient = AppStore.Client(vaporClient: req.client, secret: "foo")
+
+	return appStoreClient.validateReceipt(receipt, excludeOldTransactions: false).flatMap { (appStoreResponse) -> EventLoopFuture<Response> in
+            req.logger.debug("APPLE\tGot response from the App Store")
+            let receipt = appStoreResponse.receipt
+            guard let latestReceipt = appStoreResponse.latestReceiptInfo else {
+                return req.eventLoop.makeFailedFuture(Abort(.internalServerError, reason: "Failed to get latest receipt"))
+            }
+            req.logger.debug("APPLE\tGot receipt and latest receipt")
+            
+            guard receipt.bundleId == BUNDLE_ID_CIRCLES else {
+                return req.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Incorrect bundle ID"))
+            }
+
+            // Now let's look at the in-app purchases
+            // Did the user purchase a subscription?
+            for purchase in latestReceipt.inApp {
+                let productId = purchase.productId
+                let originalTransactionId = purchase.originalTransactionId
+                req.logger.debug("APPLE\tFound in-app purchase for product [\(productId)] with original transaction ID [\(originalTransactionId)]")
+                guard let expirationDate = purchase.subscriptionExpirationDate else {
+                    req.logger.debug("APPLE\tProduct [\(productId)] has no expiration date")
+                    continue
+                }
+                req.logger.debug("APPLE\tProduct [\(productId)] will expire on \(expirationDate)")
+
+                // Is this purchase the one that the user needed?
+                if SUBSCRIPTION_OFFERINGS.contains(productId) {
+                    req.logger.debug("APPLE\tCreating a new account with subscription product [\(productId)]")
+                    //   * Does the product ID match one of our current subscription offerings?
+                    //     * If so, is there at least one available slot remaining for this purchase?  Or has the user already created all available accounts with this one?
+                    //       * If there are slots remaining, claim one of them
+                    //         * Once we've claimed a spot, tell the user to proceed with the UIAA (return HTTP 401)
+
+                    // This is just here so that the function will compile
+                    return req.eventLoop.makeFailedFuture(Abort(.notImplemented, reason: "Not implemented yet"))
+                }
+            }
+
+            // If we checked through the whole list, and we still didn't find a valid subscription,
+            // then the user must have bought something else.  Reject the request.
+            return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "Failed to find a valid subscription"))
+        }
 
         // Then (from https://developer.apple.com/documentation/storekit/original_api_for_in-app_purchase/validating_receipts_with_the_app_store)
         /*
