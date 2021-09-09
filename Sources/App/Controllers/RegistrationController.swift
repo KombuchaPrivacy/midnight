@@ -11,15 +11,16 @@ import Fluent
 
 let LOGIN_STAGE_SIGNUP_TOKEN = "social.kombucha.login.signup_token"
 let LOGIN_STAGE_APPLE_SUBSCRIPTION = "social.kombucha.login.subscription.apple"
-let BUNDLE_ID_CIRCLES = "social.kombucha.circles"
 
 // FIXME Move this into the config file
-let SUBSCRIPTION_OFFERINGS = ["social.kombucha.circles.standard01month", "social.kombucha.circles.standard12month"]
+//let BUNDLE_ID_CIRCLES = "social.kombucha.circles"
+//let SUBSCRIPTION_OFFERINGS = ["social.kombucha.circles.standard01month", "social.kombucha.circles.standard12month"]
 
 struct RegistrationController {
     var app: Application
     var homeserver: URL
     var apiVersions: [String]
+    var appStoreConfig: Config.AppStoreConfig?
     
     // MARK: Pending subscriptions
     func createPendingSubscription(for req: Request, given numSlots: Int) //throws
@@ -229,6 +230,10 @@ struct RegistrationController {
         //   - First try the production App Store URL https://buy.itunes.apple.com/verifyReceipt
         //   - If we can't validate with the production App Store, try the sandbox environment https://sandbox.itunes.apple.com/verifyReceipt
 
+        guard let config = appStoreConfig else {
+            return req.eventLoop.makeFailedFuture(Abort(.forbidden, reason: "App Store subscriptions are not currently available"))
+        }
+
         let appStoreClient = AppStore.Client(vaporClient: req.client, secret: "foo")
 
 	return appStoreClient.validateReceipt(receipt, excludeOldTransactions: false).flatMap { (appStoreResponse) -> EventLoopFuture<Response> in
@@ -239,7 +244,7 @@ struct RegistrationController {
             }
             req.logger.debug("APPLE\tGot receipt and latest receipt")
             
-            guard receipt.bundleId == BUNDLE_ID_CIRCLES else {
+            guard receipt.bundleId == config.bundleId else {
                 return req.eventLoop.makeFailedFuture(Abort(.badRequest, reason: "Incorrect bundle ID"))
             }
 
@@ -256,7 +261,7 @@ struct RegistrationController {
                 req.logger.debug("APPLE\tProduct [\(productId)] will expire on \(expirationDate)")
 
                 // Is this purchase the one that the user needed?
-                if SUBSCRIPTION_OFFERINGS.contains(productId) {
+                if config.productIds.contains(productId) {
                     req.logger.debug("APPLE\tCreating a new account with subscription product [\(productId)]")
                     //   * Does the product ID match one of our current subscription offerings?
                     //     * If so, is there at least one available slot remaining for this purchase?  Or has the user already created all available accounts with this one?
@@ -367,12 +372,20 @@ struct RegistrationController {
         req.logger.debug("MIDNIGHT\tRe-writing UIAA flows from the homeserver")
         var ourResponseData = hsResponseData
         ourResponseData.flows = []
+        var newStages = [LOGIN_STAGE_SIGNUP_TOKEN]
+        if let config = appStoreConfig {
+            newStages.append(LOGIN_STAGE_APPLE_SUBSCRIPTION)
+        }
         for var oldFlow in hsResponseData.flows {
 
-            for newStage in [LOGIN_STAGE_SIGNUP_TOKEN, LOGIN_STAGE_APPLE_SUBSCRIPTION] {
+            if oldFlow.stages.contains("m.login.msisdn") {
+                continue
+            }
+
+            for newStage in newStages {
                 var newFlow = UiaaAuthFlow(stages: [])
 
-                if !oldFlow.stages.contains(LOGIN_STAGE_SIGNUP_TOKEN) {
+                if !oldFlow.stages.contains(newStage) {
                     newFlow.stages.append(newStage)
                 }
                 newFlow.stages.append(contentsOf: oldFlow.stages)
@@ -388,7 +401,9 @@ struct RegistrationController {
         if ourResponseData.params == nil {
             ourResponseData.params = UiaaParams()
         }
-        ourResponseData.params!.appStore = AppleSubscriptionParams(productIds: SUBSCRIPTION_OFFERINGS)
+        if let config = appStoreConfig {
+            ourResponseData.params!.appStore = AppleSubscriptionParams(productIds: config.productIds)
+        }
         
         return ourResponseData.encodeResponse(status: .unauthorized, for: req)
     }

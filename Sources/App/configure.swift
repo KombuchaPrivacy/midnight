@@ -65,7 +65,8 @@ public func configure(_ app: Application) throws {
     app.logger.info("Setting up the registration controller")
     let reg = RegistrationController(app: app,
                                      homeserver: config.homeserver,
-                                     apiVersions: ["r0", "v1"])
+                                     apiVersions: ["r0", "v1"],
+                                     appStoreConfig: config.appStore)
     
     // register routes
     app.logger.info("Registering routes")
