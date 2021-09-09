@@ -19,6 +19,9 @@ public func configure(_ app: Application) throws {
     
     app.logger.info("Setting up UIAA middleware")
     app.middleware.use(app.uiaaSessions.middleware)
+
+    /// set max body size
+    app.routes.defaultMaxBodySize = "16mb"
     
     // Load our configuration file
     app.logger.info("Loading configuration file")
